@@ -1,5 +1,8 @@
 from abc import ABC
-from enum import IntEnum
+from enum import IntFlag, IntEnum, auto
+import cbor2
+from crccheck.crc import Crc16IbmSdlc, Crc32Iscsi
+from cbor2 import dumps
 
 
 class AdminRecordType:
@@ -14,16 +17,16 @@ class AdminRecord:
     pass
 
 
-class BlockPCFlags(IntEnum):
+class BlockPCFlags(IntFlag):
     """Block Processing Control Flags."""
 
-    FRAG_REPLICATE = 0
-    REP_UNPROC = 1
-    DEL_UNPROC = 2
-    DEL_BLOCK_UNPROC = 4
+    FRAG_REPLICATE = 1
+    REP_UNPROC = 2
+    DEL_UNPROC = 4
+    DEL_BLOCK_UNPROC = 16
 
 
-class BlockType:
+class BlockType(IntFlag):
     """BPv7 Block Type Flag Definitions.
 
     .. note::
@@ -36,18 +39,18 @@ class BlockType:
     HOP_COUNT = 10
 
 
-class BundlePCFlags(IntEnum):
-    """Bundle Processing Control Flag."""
+class BundlePCFlags(IntFlag):
+    """Bundle Processing Control Flags."""
 
-    FRAGMENT = 0
-    ADMIN_RECORD = 1
-    BUNDLE_NO_FRAG = 2
-    ACK_REQ = 5
-    REPORT_STATUS_TIME = 6
-    REPORT_BUNDLE_RCV = 14
-    REPORT_BUNDLE_FWD = 16
-    REPORT_BUNDLE_DLV = 17
-    REPORTBUNDLE_DEL = 18
+    IS_FRAGMENT = 1
+    IS_ADMIN_RECORD = 2
+    MUST_NOT_FRAGMENT = 4
+    RQST_ACK = 32
+    RPRT_STAT_TIME = 64
+    RPRT_RECEP = 16384
+    RPRT_FORWARDING = 65536
+    RPRT_DELIVERY = 131072
+    RPRT_DELETION = 262144
 
 
 class CreationTimestamp:
@@ -60,7 +63,7 @@ class CreationTimestamp:
         """
         self.time = timestamp_fields["time"]
         self.sequence = timestamp_fields["sequence"]
-
+    
     @classmethod
     def decode(cls, cand_timestamp):
         """Attempt to parse a Creation Timestamp.
@@ -73,13 +76,28 @@ class CreationTimestamp:
         return CreationTimestamp(timestamp_d)
 
 
-class CRCType(IntEnum):
+class CRCType(IntFlag):
     """BPv7 Supported CRC Types."""
 
     NONE = 0
     CRC16_X25 = 1
     CRC32_C = 2
+    
+class CRCFlag(IntEnum):
+    CALCULATE = 0
 
+def calc_crc(crc_type, fields):
+    match crc_type:
+        case CRCType.CRC16_X25:
+            fields.append(b'\x00\x00')
+            crc = Crc16IbmSdlc.calc(dumps(fields, default=default_encoder))
+            return crc.to_bytes(2, 'big') 
+        case CRCType.CRC32_C:
+            fields.append(b'\x00\x00\x00\x00')
+            crc = Crc32Iscsi.calc(dumps(fields, default=default_encoder))
+            return crc.to_bytes(4, 'big') 
+        case _:
+            return None        
 
 class EID:
     """Endpoint Identifier."""
@@ -105,4 +123,14 @@ class EID:
             "ssp": {"node_num": cand_eid[1][0], "service_num": cand_eid[1][1]},
         }
         return EID(eid_d)
+
+def default_encoder(encoder, value):
+    """Default handler for cbor encoding custom field types with cbor2."""
+    
+    if isinstance(value, EID):
+        encoder.encode([value.uri, [value.ssp["node_num"], value.ssp["service_num"]]])
+    elif isinstance(value,CreationTimestamp):
+        encoder.encode([value.time, value.sequence])
+    else:
+        raise TypeError
 

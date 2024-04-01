@@ -1,2 +1,4 @@
-*.gem
+/dist/
+/build/
+/dtngen.egg-info/
 
