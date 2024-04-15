@@ -1,4 +1,7 @@
+Pipfile
+*.json
+*.bin
 /dist/
-/build/
+build/
 /dtngen.egg-info/
-
+__pycache__/

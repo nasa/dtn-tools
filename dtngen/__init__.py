@@ -1,39 +1,46 @@
-from .types import AdminRecordType
-from .types import AdminRecord
-from .types import BlockPCFlags
-from .types import BlockType
-from .types import BundlePCFlags
-from .types import CreationTimestamp
-from .types import CRCType
-from .types import CRCFlag
-from .types import EID
-
-from .blocks import Block
-from .blocks import CanonicalBlock
-from .blocks import PayloadBlock
-from .blocks import PrimaryBlock
-from .blocks import PrevNodeBlock
-from .blocks import BundleAgeBlock
-from .blocks import HopCountBlock
-
+from .__version__ import __version__
+from .blocks import (
+    Block,
+    BundleAgeBlock,
+    CanonicalBlock,
+    HopCountBlock,
+    PayloadBlock,
+    PrevNodeBlock,
+    PrimaryBlock,
+)
 from .bundle import Bundle
+from .types import (
+    EID,
+    AdminRecord,
+    AdminRecordType,
+    BlockPCFlags,
+    BlockType,
+    BundlePCFlags,
+    CRCFlag,
+    CRCType,
+    CreationTimestamp,
+)
 
 __all__ = [
+    "__version__",
     # Types
-    "AdminRecordType",
-    "AdminRecord",
-    "BlockPCFlag",
-    "BundlePCFlags",
-    "CreationTimestamp",
-    "CRCType",
     "EID",
-
+    "AdminRecord",
+    "AdminRecordType",
+    "BlockPCFlags",
+    "BlockType",
+    "BundlePCFlags",
+    "CRCFlag",
+    "CRCType",
+    "CreationTimestamp",
     # Blocks
     "Block",
+    "BundleAgeBlock",
     "CanonicalBlock",
+    "HopCountBlock",
     "PayloadBlock",
-    "PrimaryBlock"
-
+    "PrevNodeBlock",
+    "PrimaryBlock",
     # Bundle
-    "Bundle"
+    "Bundle",
 ]

@@ -1,8 +1,7 @@
-from abc import ABC
-from enum import IntFlag, IntEnum, auto
-import cbor2
-from crccheck.crc import Crc16IbmSdlc, Crc32Iscsi
+from enum import IntEnum, IntFlag
+
 from cbor2 import dumps
+from crccheck.crc import Crc16IbmSdlc, Crc32Iscsi
 
 
 class AdminRecordType:
@@ -63,7 +62,7 @@ class CreationTimestamp:
         """
         self.time = timestamp_fields["time"]
         self.sequence = timestamp_fields["sequence"]
-    
+
     @classmethod
     def decode(cls, cand_timestamp):
         """Attempt to parse a Creation Timestamp.
@@ -82,22 +81,31 @@ class CRCType(IntFlag):
     NONE = 0
     CRC16_X25 = 1
     CRC32_C = 2
-    
+
+
 class CRCFlag(IntEnum):
+    """Flag to indicate if CRC should be calculated."""
+
     CALCULATE = 0
 
+
 def calc_crc(crc_type, fields):
-    match crc_type:
-        case CRCType.CRC16_X25:
-            fields.append(b'\x00\x00')
-            crc = Crc16IbmSdlc.calc(dumps(fields, default=default_encoder))
-            return crc.to_bytes(2, 'big') 
-        case CRCType.CRC32_C:
-            fields.append(b'\x00\x00\x00\x00')
-            crc = Crc32Iscsi.calc(dumps(fields, default=default_encoder))
-            return crc.to_bytes(4, 'big') 
-        case _:
-            return None        
+    """Calculate CRC given crc type and fields.
+
+    :param CRCType crc_type: The CRC algorithm to use. Valid values are CRCType.CRC16_X25 and CRCType.CRC32_C
+    :param bytearray fields: The bytearray of bundle fields to calculate the CRC on
+    """
+    if crc_type == CRCType.CRC16_X25:
+        fields.append(b"\x00\x00")
+        crc = Crc16IbmSdlc.calc(dumps(fields, default=default_encoder))
+        return crc.to_bytes(2, "big")
+    elif crc_type == CRCType.CRC32_C:
+        fields.append(b"\x00\x00\x00\x00")
+        crc = Crc32Iscsi.calc(dumps(fields, default=default_encoder))
+        return crc.to_bytes(4, "big")
+    else:
+        return None
+
 
 class EID:
     """Endpoint Identifier."""
@@ -124,13 +132,12 @@ class EID:
         }
         return EID(eid_d)
 
+
 def default_encoder(encoder, value):
-    """Default handler for cbor encoding custom field types with cbor2."""
-    
+    """cbor2 custom field encoder."""
     if isinstance(value, EID):
         encoder.encode([value.uri, [value.ssp["node_num"], value.ssp["service_num"]]])
-    elif isinstance(value,CreationTimestamp):
+    elif isinstance(value, CreationTimestamp):
         encoder.encode([value.time, value.sequence])
     else:
         raise TypeError
-
