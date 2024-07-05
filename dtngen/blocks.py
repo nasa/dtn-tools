@@ -2,6 +2,7 @@ import json
 from abc import ABC
 
 import cbor2
+from itertools import zip_longest
 
 from .dtnjson import custom_encoder
 from .types import EID, CRCFlag, CreationTimestamp, calc_crc, default_encoder
@@ -27,7 +28,7 @@ class Block(ABC):
 
 class CanonicalBlock(Block):
     """RFC9171 Extension Block Base Class."""
-
+    
     def __init__(self, blk_type, blk_num, control_flags, crc_type, crc=None):
         """Initialize the extension block with the requested fields.
 
@@ -50,8 +51,8 @@ class CanonicalBlock(Block):
     def decode_common(cls, cand_block):
         """Decode the fields common to all canonical blocks.
 
-        :param list cand_block: A list representing the candidate canonical \
-            block
+        :param list cand_block: A list representing the candidate Canonical \
+            Block
         """
         block_fields = {}
         block_fields["blk_type"] = cand_block[0]
@@ -62,6 +63,88 @@ class CanonicalBlock(Block):
             block_fields["crc"] = cand_block[5]
 
         return block_fields
+        
+    def encode(self, type_spec_data):
+        """Encode the canonical block using CBOR with the type-specific data.
+
+        :return: A CBOR-encoded block
+        :rtype: bytearray
+        """
+        if self.crc is None:
+            return cbor2.dumps(
+                [
+                    self.blk_type,
+                    self.blk_num,
+                    self.control_flags,
+                    self.crc_type,
+                    type_spec_data,
+                ],
+                default=default_encoder,
+            )
+        elif self.crc == CRCFlag.CALCULATE:
+            self.crc = calc_crc(
+                self.crc_type,
+                [
+                    self.blk_type,
+                    self.blk_num,
+                    self.control_flags,
+                    self.crc_type,
+                    type_spec_data,
+                ],
+            )
+
+        return cbor2.dumps(
+            [
+                self.blk_type,
+                self.blk_num,
+                self.control_flags,
+                self.crc_type,
+                type_spec_data,
+                self.crc,
+            ],
+            default=default_encoder,
+        )
+        
+    def to_json(self, type_spec_data):
+        """Encode the canonical block using json with the type-specific data.
+
+        :return: A json-encoded block
+        :rtype: string
+        """
+        if self.crc is None:
+            return json.dumps(
+                [
+                    self.blk_type,
+                    self.blk_num,
+                    self.control_flags,
+                    self.crc_type,
+                    type_spec_data,
+                ],
+                default=custom_encoder,
+            )
+        elif self.crc == CRCFlag.CALCULATE:
+            self.crc = calc_crc(
+                self.crc_type,
+                [
+                    self.blk_type,
+                    self.blk_num,
+                    self.control_flags,
+                    self.crc_type,
+                    cbor2.dumps(type_spec_data, default=default_encoder),
+                ],
+            )
+
+        return json.dumps(
+            [
+                self.blk_type,
+                self.blk_num,
+                self.control_flags,
+                self.crc_type,
+                type_spec_data,
+                self.crc,
+            ],
+            default=custom_encoder,
+        )
 
 
 class PrevNodeBlock(CanonicalBlock):
@@ -82,98 +165,44 @@ class PrevNodeBlock(CanonicalBlock):
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
         self.prev_eid = prev_eid
 
+    def get_type_spec(self):
+        """Return the type-specific value.
+
+        :return: Type-specific value
+        :rtype: EID
+        """        
+        return self.prev_eid
+
     def encode(self):
         """Encode the PrevNodeBlock block using CBOR.
 
         :return: A CBOR-encoded block
         :rtype: bytearray
         """
-        if self.crc is None:
-            return cbor2.dumps(
-                [
-                    self.blk_type,
-                    self.blk_num,
-                    self.control_flags,
-                    self.crc_type,
-                    self.prev_eid,
-                ],
-                default=default_encoder,
-            )
-        elif self.crc == CRCFlag.CALCULATE:
-            self.crc = calc_crc(
-                self.crc_type,
-                [
-                    self.blk_type,
-                    self.blk_num,
-                    self.control_flags,
-                    self.crc_type,
-                    self.prev_eid,
-                ],
-            )
-
-        return cbor2.dumps(
-            [
-                self.blk_type,
-                self.blk_num,
-                self.control_flags,
-                self.crc_type,
-                self.prev_eid,
-                self.crc,
-            ],
-            default=default_encoder,
-        )
-
+        return super().encode(cbor2.dumps(self.get_type_spec(), \
+            default=default_encoder))
+        
     def to_json(self):
         """Encode the PrevNodeBlock block using json.
 
         :return: A json-encoded block
         :rtype: string
         """
-        if self.crc is None:
-            return json.dumps(
-                [
-                    self.blk_type,
-                    self.blk_num,
-                    self.control_flags,
-                    self.crc_type,
-                    self.prev_eid,
-                ],
-                default=custom_encoder,
-            )
-        elif self.crc == CRCFlag.CALCULATE:
-            self.crc = calc_crc(
-                self.crc_type,
-                [
-                    self.blk_type,
-                    self.blk_num,
-                    self.control_flags,
-                    self.crc_type,
-                    self.prev_eid,
-                ],
-            )
-
-        return json.dumps(
-            [
-                self.blk_type,
-                self.blk_num,
-                self.control_flags,
-                self.crc_type,
-                self.prev_eid,
-                self.crc,
-            ],
-            default=custom_encoder,
-        )
-
+        return super().to_json(self.get_type_spec())
+        
     @classmethod
     def decode(cls, cand_block):
         """Attempt to decode the candidate block as a BPv7 Previouse Node Block.
 
         :params list cand_block: A list of objects to be interpreted as a \
-            Previous Node block.
+            Previous Node Block.
         """
         canon_fields = CanonicalBlock.decode_common(cand_block)
+        
+        # Type-specific data is doubly encoded, so need to further cbor decode
+        tmp = cbor2.loads(cand_block[4])
 
-        return PrevNodeBlock(**canon_fields, prev_eid=EID.decode(cand_block[4]))
+        return PrevNodeBlock(**canon_fields, prev_eid=EID.decode(tmp))
 
 
 class BundleAgeBlock(CanonicalBlock):
@@ -196,98 +225,44 @@ class BundleAgeBlock(CanonicalBlock):
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
         self.bundle_age = bundle_age
 
+    def get_type_spec(self):
+        """Return the type-specific value.
+
+        :return: Type-specific value
+        :rtype: unsigned int
+        """        
+        return self.bundle_age
+
     def encode(self):
         """Encode the BundleAgeBlock block using CBOR.
 
         :return: A CBOR-encoded block
         :rtype: bytearray
         """
-        if self.crc is None:
-            return cbor2.dumps(
-                [
-                    self.blk_type,
-                    self.blk_num,
-                    self.control_flags,
-                    self.crc_type,
-                    self.bundle_age,
-                ],
-                default=default_encoder,
-            )
-        elif self.crc == CRCFlag.CALCULATE:
-            self.crc = calc_crc(
-                self.crc_type,
-                [
-                    self.blk_type,
-                    self.blk_num,
-                    self.control_flags,
-                    self.crc_type,
-                    self.bundle_age,
-                ],
-            )
-
-        return cbor2.dumps(
-            [
-                self.blk_type,
-                self.blk_num,
-                self.control_flags,
-                self.crc_type,
-                self.bundle_age,
-                self.crc,
-            ],
-            default=default_encoder,
-        )
-
+        return super().encode(cbor2.dumps(self.get_type_spec(), \
+            default=default_encoder))
+        
     def to_json(self):
         """Encode the BundleAgeBlock block using json.
 
         :return: A json-encoded block
         :rtype: string
         """
-        if self.crc is None:
-            return json.dumps(
-                [
-                    self.blk_type,
-                    self.blk_num,
-                    self.control_flags,
-                    self.crc_type,
-                    self.bundle_age,
-                ],
-                default=custom_encoder,
-            )
-        elif self.crc == CRCFlag.CALCULATE:
-            self.crc = calc_crc(
-                self.crc_type,
-                [
-                    self.blk_type,
-                    self.blk_num,
-                    self.control_flags,
-                    self.crc_type,
-                    self.bundle_age,
-                ],
-            )
-
-        return json.dumps(
-            [
-                self.blk_type,
-                self.blk_num,
-                self.control_flags,
-                self.crc_type,
-                self.bundle_age,
-                self.crc,
-            ],
-            default=custom_encoder,
-        )
+        return super().to_json(self.get_type_spec())
 
     @classmethod
     def decode(cls, cand_block):
         """Attempt to decode the candidate block as a BPv7 Bundle Age Block.
 
         :params list cand_block: A list of objects to be interpreted as a \
-            Bundle Age block.
+            Bundle Age Block.
         """
         canon_fields = CanonicalBlock.decode_common(cand_block)
 
-        return BundleAgeBlock(**canon_fields, bundle_age=cand_block[4])
+        # Type-specific data is doubly encoded, so need to further cbor decode
+        tmp = cbor2.loads(cand_block[4])
+
+        return BundleAgeBlock(**canon_fields, bundle_age=tmp)
 
 
 class HopCountBlock(CanonicalBlock):
@@ -313,101 +288,217 @@ class HopCountBlock(CanonicalBlock):
         self.hop_limit = hop_limit
         self.hop_count = hop_count
 
+    def get_type_spec(self):
+        """Return the type-specific values as a list.
+
+        :return: Type-specific values
+        :rtype: list
+        """        
+        return [self.hop_limit, self.hop_count]
+
     def encode(self):
         """Encode the HopCountBlock block using CBOR.
 
         :return: A CBOR-encoded block
         :rtype: bytearray
         """
-        if self.crc is None:
-            return cbor2.dumps(
-                [
-                    self.blk_type,
-                    self.blk_num,
-                    self.control_flags,
-                    self.crc_type,
-                    [self.hop_limit, self.hop_count],
-                ],
-                default=default_encoder,
-            )
-        elif self.crc == CRCFlag.CALCULATE:
-            self.crc = calc_crc(
-                self.crc_type,
-                [
-                    self.blk_type,
-                    self.blk_num,
-                    self.control_flags,
-                    self.crc_type,
-                    [self.hop_limit, self.hop_count],
-                ],
-            )
-
-        return cbor2.dumps(
-            [
-                self.blk_type,
-                self.blk_num,
-                self.control_flags,
-                self.crc_type,
-                [self.hop_limit, self.hop_count],
-                self.crc,
-            ],
-            default=default_encoder,
-        )
-
+        return super().encode(cbor2.dumps(self.get_type_spec(), \
+            default=default_encoder))
+        
     def to_json(self):
         """Encode the HopCountBlock block using json.
 
         :return: A json-encoded block
         :rtype: string
         """
-        if self.crc is None:
-            return json.dumps(
-                [
-                    self.blk_type,
-                    self.blk_num,
-                    self.control_flags,
-                    self.crc_type,
-                    [self.hop_limit, self.hop_count],
-                ],
-                default=custom_encoder,
-            )
-        elif self.crc == CRCFlag.CALCULATE:
-            self.crc = calc_crc(
-                self.crc_type,
-                [
-                    self.blk_type,
-                    self.blk_num,
-                    self.control_flags,
-                    self.crc_type,
-                    [self.hop_limit, self.hop_count],
-                ],
-            )
-
-        return json.dumps(
-            [
-                self.blk_type,
-                self.blk_num,
-                self.control_flags,
-                self.crc_type,
-                [self.hop_limit, self.hop_count],
-                self.crc,
-            ],
-            default=custom_encoder,
-        )
+        return super().to_json(self.get_type_spec())
 
     @classmethod
     def decode(cls, cand_block):
         """Attempt to decode the candidate block as a BPv7 Hop Count Block.
 
         :params list cand_block: A list of objects to be interpreted as a \
-            payload block.
+            Hop Count Block.
         """
         canon_fields = CanonicalBlock.decode_common(cand_block)
 
-        return HopCountBlock(
-            **canon_fields, hop_limit=cand_block[4][0], \
-                hop_count=cand_block[4][1]
+        # Type-specific data is doubly encoded, so need to further cbor decode
+        tmp = cbor2.loads(cand_block[4])
+        
+        return HopCountBlock(**canon_fields, hop_limit=tmp[0], hop_count=tmp[1])
+
+
+class CustodyTransferBlock(CanonicalBlock):
+    """Class to represent Custody Transfer Extension Block."""
+
+    def __init__(
+        self, blk_type, blk_num, control_flags, crc_type, trans_id, \
+            trans_series_id, req_orig_eid, crc=None
+    ):
+        """Initialize the custody transfer extension block with the requested \
+            fields.
+
+        :param BlockType blk_type: the type of Canonical block
+        :param int blk_num: block number
+        :param BlockPCFlags control_flags: block processing control flags
+        :param CRCType crc_type: CRC type
+        :param int trans_id: identifier for the custody signal
+        :param int trans_series_id: identifier for a transmission series
+        :param int req_orig_eid: EID of the originator of the custody request
+        :param int crc: (optional) crc value or CRCFlag.CALCULATE to \
+            calculate it
+        """
+        super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
+        self.trans_id = trans_id
+        self.trans_series_id = trans_series_id
+        self.req_orig_eid = req_orig_eid
+
+    def get_type_spec(self):
+        """Return the type-specific values as a list.
+
+        :return: Type-specific values
+        :rtype: list
+        """        
+        return [self.trans_id, self.trans_series_id, self.req_orig_eid]
+
+    def encode(self):
+        """Encode the CustodyTransferBlock block using CBOR.
+
+        :return: A CBOR-encoded block
+        :rtype: bytearray
+        """
+        return super().encode(cbor2.dumps(self.get_type_spec(), \
+            default=default_encoder))
+        
+    def to_json(self):
+        """Encode the CustodyTransferBlock block using json.
+
+        :return: A json-encoded block
+        :rtype: string
+        """
+        return super().to_json(self.get_type_spec())
+
+    @classmethod
+    def decode(cls, cand_block):
+        """Attempt to decode the candidate block as a BPv7 Custody Transfer \
+            Extension Block.
+
+        :params list cand_block: A list of objects to be interpreted as a \
+            Custody Transfer Extension Block.
+        """
+        canon_fields = CanonicalBlock.decode_common(cand_block)
+
+        # Type-specific data is doubly encoded, so need to further cbor decode
+        tmp = cbor2.loads(cand_block[4])
+        
+        return CustodyTransferBlock(
+            **canon_fields, trans_id=tmp[0], \
+                trans_series_id=tmp[1], \
+                req_orig_eid=EID.decode(tmp[2])
         )
+
+
+class CompressedReportingBlock(CanonicalBlock):
+    """Class to represent Compressed Reporting Extension Block."""
+
+    def __init__(
+        self, blk_type, blk_num, control_flags, crc_type, bundle_seq_num, \
+            bundle_seq_id=None, rpt_request_flags=None, scope_node_id=None, \
+            rpt_eid=None, crc=None
+    ):
+        """Initialize the compress reporting extension block with the \
+            requested fields. For the block-type-specific fields, if one is \
+            provided, all prior ones must also be provided. For example, if \
+            rpt_request_flags is provided, then both bundle_seq_id and \
+            bundle_seq_num must be provided as well.
+
+        :param BlockType blk_type: the type of Canonical block
+        :param int blk_num: block number
+        :param BlockPCFlags control_flags: block processing control flags
+        :param CRCType crc_type: CRC type
+        :param int bundle_seq_num: bundle sequence number
+        :param int bundle_seq_id: bundle sequence identifier
+        :param int rpt_request_flags: status report request flags
+        :param int scope_node_id: EID of the node that created the CREB
+        :param int rpt_eid: EID of the node to send the reports to
+        :param int crc: (optional) crc value or CRCFlag.CALCULATE to \
+            calculate it
+        """
+        super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
+        self.bundle_seq_num = bundle_seq_num
+        self.bundle_seq_id = bundle_seq_id
+        self.rpt_request_flags = rpt_request_flags
+        self.scope_node_id = scope_node_id
+        self.rpt_eid = rpt_eid
+        
+        if (bundle_seq_id is not None and bundle_seq_num is None) \
+            or (rpt_request_flags is not None and any(arg is None for arg in (bundle_seq_num, bundle_seq_id))) \
+            or (scope_node_id is not None and any(arg is None for arg in (bundle_seq_num, bundle_seq_id, rpt_request_flags))) \
+            or (rpt_eid is not None and any(arg is None for arg in (bundle_seq_num, bundle_seq_id, rpt_request_flags, scope_node_id))):
+                raise ValueError(
+                    "Compressed Reporting Extension Block: One or more of bundle_seq_id, rpt_request_flags, scope_node_id or rpt_eid was provided without one or more of the prior arguments provided"
+                )
+
+    def get_type_spec(self):
+        """Return the type-specific values as a list.
+
+        :return: Type-specific values
+        :rtype: list
+        """
+        type_spec_vals = []
+        if self.bundle_seq_num is not None:
+            type_spec_vals.append(self.bundle_seq_num)
+        if self.bundle_seq_id is not None:
+            type_spec_vals.append(self.bundle_seq_id)
+        if self.rpt_request_flags is not None:
+            type_spec_vals.append(self.rpt_request_flags)
+        if self.scope_node_id is not None:
+            type_spec_vals.append(self.scope_node_id)
+        if self.rpt_eid is not None:
+            type_spec_vals.append(self.rpt_eid)
+        
+        return type_spec_vals
+        
+    def encode(self):
+        """Encode the CompressedReportingBlock block using CBOR.
+
+        :return: A CBOR-encoded block
+        :rtype: bytearray
+        """
+        return super().encode(cbor2.dumps(self.get_type_spec(), \
+            default=default_encoder))
+        
+    def to_json(self):
+        """Encode the CompressedReportingBlock block using json.
+
+        :return: A json-encoded block
+        :rtype: string
+        """
+        return super().to_json(self.get_type_spec())
+
+    @classmethod
+    def decode(cls, cand_block):
+        """Attempt to decode the candidate block as a BPv7 Compressed \
+            Reporting Extension Block.
+
+        :params list cand_block: A list of objects to be interpreted as a \
+            Compressed Reporting Extension Block.
+        """
+        canon_fields = CanonicalBlock.decode_common(cand_block)
+
+        # Type-specific data is doubly encoded, so need to further cbor decode
+        tmp = cbor2.loads(cand_block[4])
+        
+        type_spec_dict = {"bundle_seq_num":None, "bundle_seq_id":None, \
+            "rpt_request_flags":None, "scope_node_id":None, "rpt_eid":None}
+        type_spec_args = dict(zip_longest(type_spec_dict, tmp))
+        
+        if type_spec_args["scope_node_id"] is not None:
+            type_spec_args["scope_node_id"] = EID.decode(type_spec_args["scope_node_id"])
+        if type_spec_args["rpt_eid"] is not None:
+            type_spec_args["rpt_eid"] = EID.decode(type_spec_args["rpt_eid"])
+        
+        return CompressedReportingBlock(**canon_fields, **type_spec_args)
 
 
 class PayloadBlock(CanonicalBlock):
@@ -427,47 +518,23 @@ class PayloadBlock(CanonicalBlock):
         """
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
         self.payload = payload
+        self.type_spec_data = payload   # payload is NOT doubly cbor encoded
+
+    def get_type_spec(self):
+        """Return the payload
+
+        :return: Payload
+        :rtype: CBOR bytestring
+        """                    
+        return self.payload
 
     def encode(self):
-        """Encode the Payload block using CBOR.
+        """Encode the PayloadBlock block using CBOR.
 
         :return: A CBOR-encoded block
         :rtype: bytearray
         """
-        if self.crc is None:
-            return cbor2.dumps(
-                [
-                    self.blk_type,
-                    self.blk_num,
-                    self.control_flags,
-                    self.crc_type,
-                    self.payload,
-                ],
-                default=default_encoder,
-            )
-        elif self.crc == CRCFlag.CALCULATE:
-            self.crc = calc_crc(
-                self.crc_type,
-                [
-                    self.blk_type,
-                    self.blk_num,
-                    self.control_flags,
-                    self.crc_type,
-                    self.payload,
-                ],
-            )
-
-        return cbor2.dumps(
-            [
-                self.blk_type,
-                self.blk_num,
-                self.control_flags,
-                self.crc_type,
-                self.payload,
-                self.crc,
-            ],
-            default=default_encoder,
-        )
+        return super().encode(self.get_type_spec())
 
     def to_json(self):
         """Encode the Payload block using json.
@@ -475,6 +542,7 @@ class PayloadBlock(CanonicalBlock):
         :return: A json-encoded block
         :rtype: string
         """
+        type_spec = self.get_type_spec()
         if self.crc is None:
             return json.dumps(
                 [
@@ -482,7 +550,7 @@ class PayloadBlock(CanonicalBlock):
                     self.blk_num,
                     self.control_flags,
                     self.crc_type,
-                    self.payload,
+                    type_spec,
                 ],
                 default=custom_encoder,
             )
@@ -494,7 +562,7 @@ class PayloadBlock(CanonicalBlock):
                     self.blk_num,
                     self.control_flags,
                     self.crc_type,
-                    self.payload,
+                    type_spec,
                 ],
             )
 
@@ -504,7 +572,7 @@ class PayloadBlock(CanonicalBlock):
                 self.blk_num,
                 self.control_flags,
                 self.crc_type,
-                self.payload,
+                type_spec,
                 self.crc,
             ],
             default=custom_encoder,
@@ -515,7 +583,7 @@ class PayloadBlock(CanonicalBlock):
         """Attempt to decode the candidate block as a BPv7 Payload Block.
 
         :params list cand_block: A list of objects to be interpreted as a \
-            payload block.
+            Payload Block.
         """
         canon_fields = CanonicalBlock.decode_common(cand_block)
 
@@ -669,7 +737,7 @@ class PrimaryBlock(Block):
         """Attempt to decode the candidate block as a BPv7 Primary Block.
 
         :params list cand_block: A list of objects to be interpreted as a \
-            primary block.
+            Primary Block.
         """
         # TODO: Length checks
 

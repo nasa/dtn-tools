@@ -8,6 +8,8 @@ from .blocks import (
     HopCountBlock,
     PayloadBlock,
     PrevNodeBlock,
+    CustodyTransferBlock,
+    CompressedReportingBlock,
     PrimaryBlock,
 )
 from .dtnjson import custom_decoder
@@ -22,6 +24,8 @@ class Bundle:
         BlockType.PREVIOUS_NODE: PrevNodeBlock,
         BlockType.BUNDLE_AGE: BundleAgeBlock,
         BlockType.HOP_COUNT: HopCountBlock,
+        BlockType.CUST_TRANS_EXT: CustodyTransferBlock,
+        BlockType.COMP_RPT_EXT: CompressedReportingBlock,
     }
 
     def __init__(self, pri_block, canon_blocks):
@@ -153,9 +157,17 @@ class Bundle:
             block_type = block[0]
             block_cls = cls._block_lookup.get(block_type, None)
             if block_cls:
-                if block_cls == HopCountBlock:
+                if block_cls == HopCountBlock \
+                        or block_cls == CustodyTransferBlock \
+                        or block_cls == CompressedReportingBlock:
                     block = _flatten(block)
-                canon_blocks.append(block_cls(*block))
+                if block_cls == CompressedReportingBlock:
+                    if block[3] >= 1:
+                        crc_val = block[-1]
+                        block = block[:-1]
+                        canon_blocks.append(block_cls(*block, crc=crc_val))
+                else:
+                    canon_blocks.append(block_cls(*block))
             else:
                 print(f"WARNING: Unknown block type {block_type}. Skipping block.")
 

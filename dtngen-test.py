@@ -7,12 +7,15 @@ from dtngen import (
     Bundle,
     BundleAgeBlock,
     BundlePCFlags,
+    StatusRRFlags,
     CRCFlag,
     CRCType,
     CreationTimestamp,
     HopCountBlock,
     PayloadBlock,
     PrevNodeBlock,
+    CustodyTransferBlock,
+    CompressedReportingBlock,
     PrimaryBlock,
 )
 
@@ -101,9 +104,32 @@ hop_count_block = HopCountBlock(
     crc=CRCFlag.CALCULATE,
 )
 
+cte_block = CustodyTransferBlock(
+    blk_type=BlockType.CUST_TRANS_EXT,
+    blk_num=4,
+    control_flags=BlockPCFlags.REP_UNPROC,
+    crc_type=CRCType.CRC16_X25,
+    trans_id=10,
+    trans_series_id = 2,
+    req_orig_eid=EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
+    crc=CRCFlag.CALCULATE,
+)
+
+cre_block = CompressedReportingBlock(
+    blk_type=BlockType.COMP_RPT_EXT,
+    blk_num=5,
+    control_flags=0,
+    crc_type=CRCType.CRC16_X25,
+    bundle_seq_num=1,
+    bundle_seq_id=2,
+    rpt_request_flags=StatusRRFlags.RECEPTION | StatusRRFlags.DELIVERY | StatusRRFlags.REASSEMBLY,
+    scope_node_id=EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
+    crc=CRCFlag.CALCULATE,
+)
+
 payload_block = PayloadBlock(
     blk_type=BlockType.BUNDLE_PAYLOAD,
-    blk_num=4,
+    blk_num=5,
     control_flags=0,
     crc_type=CRCType.CRC16_X25,
     payload=b"\x00\x00\x00\x00\x00\x00\x00\x0chello world\n",
@@ -113,7 +139,8 @@ payload_block = PayloadBlock(
 # Use them to create a bundle object
 bundle = Bundle(
     pri_block=primary_block,
-    canon_blocks=[prev_node_block, bundle_age_block, hop_count_block, payload_block],
+    canon_blocks=[prev_node_block, bundle_age_block, hop_count_block, \
+        cte_block, cre_block, payload_block],
 )
 
 
@@ -170,7 +197,7 @@ assert bfromfile.canon_blocks[0].crc_type == CRCType.CRC16_X25
 assert bfromfile.canon_blocks[0].prev_eid.uri == 2
 assert bfromfile.canon_blocks[0].prev_eid.ssp["node_num"] == 300
 assert bfromfile.canon_blocks[0].prev_eid.ssp["service_num"] == 2
-assert bfromfile.canon_blocks[0].crc == b"\x29\x49"
+assert bfromfile.canon_blocks[0].crc == b"\x55\x53"
 
 # Parse Bundle Age block
 assert bfromfile.canon_blocks[1].blk_type == BlockType.BUNDLE_AGE
@@ -181,7 +208,7 @@ assert (
 )
 assert bfromfile.canon_blocks[1].crc_type == CRCType.CRC16_X25
 assert bfromfile.canon_blocks[1].bundle_age == 108000
-assert bfromfile.canon_blocks[1].crc == b"\x5e\x0f"
+assert bfromfile.canon_blocks[1].crc == b"\x3a\xed"
 
 # Parse Hop Count block
 assert bfromfile.canon_blocks[2].blk_type == BlockType.HOP_COUNT
@@ -190,20 +217,35 @@ assert bfromfile.canon_blocks[2].control_flags == BlockPCFlags.FRAG_REPLICATE
 assert bfromfile.canon_blocks[2].crc_type == CRCType.CRC16_X25
 assert bfromfile.canon_blocks[2].hop_limit == 15
 assert bfromfile.canon_blocks[2].hop_count == 3
-assert bfromfile.canon_blocks[2].crc == b"\x60\xb9"
+assert bfromfile.canon_blocks[2].crc == b"\xf8\x13"
+
+# Parse Custody Transfer Extension block
+assert bfromfile.canon_blocks[3].blk_type == BlockType.CUST_TRANS_EXT
+assert bfromfile.canon_blocks[3].blk_num == 4
+assert bfromfile.canon_blocks[3].control_flags == BlockPCFlags.REP_UNPROC
+assert bfromfile.canon_blocks[3].crc_type == CRCType.CRC16_X25
+assert bfromfile.canon_blocks[3].trans_id == 10
+assert bfromfile.canon_blocks[3].trans_series_id == 2
+assert bfromfile.canon_blocks[3].req_orig_eid.uri == 2
+assert bfromfile.canon_blocks[3].req_orig_eid.ssp["node_num"] == 303
+assert bfromfile.canon_blocks[3].req_orig_eid.ssp["service_num"] == 1
+assert bfromfile.canon_blocks[3].crc == b"\x25\xc7"
 
 # Parse Payload block
-assert bfromfile.canon_blocks[3].blk_type == BlockType.BUNDLE_PAYLOAD
-assert bfromfile.canon_blocks[3].blk_num == 4
-assert bfromfile.canon_blocks[3].control_flags == 0
-assert bfromfile.canon_blocks[3].crc_type == CRCType.CRC16_X25
+assert bfromfile.canon_blocks[5].blk_type == BlockType.BUNDLE_PAYLOAD
+assert bfromfile.canon_blocks[5].blk_num == 5
+assert bfromfile.canon_blocks[5].control_flags == 0
+assert bfromfile.canon_blocks[5].crc_type == CRCType.CRC16_X25
 assert (
-    bfromfile.canon_blocks[3].payload
+    bfromfile.canon_blocks[5].payload
     == b"\x00\x00\x00\x00\x00\x00\x00\x0chello world\n"
 )
-bplib_payload_str = bfromfile.canon_blocks[3].payload[8:].decode().strip()
+bplib_payload_str = bfromfile.canon_blocks[5].payload[8:].decode().strip()
 assert bplib_payload_str == "hello world"
-assert bfromfile.canon_blocks[3].crc == b"\x69\x56"
+assert bfromfile.canon_blocks[5].crc == b"\x3b\x1e"
+
+read_bytes = bfromfile.to_bytes()
+assert read_bytes == encoded
 
 
 # Step 9: Verify the bundle from bytes is identical to the input
@@ -238,7 +280,7 @@ assert bfrombytes.canon_blocks[0].crc_type == CRCType.CRC16_X25
 assert bfrombytes.canon_blocks[0].prev_eid.uri == 2
 assert bfrombytes.canon_blocks[0].prev_eid.ssp["node_num"] == 300
 assert bfrombytes.canon_blocks[0].prev_eid.ssp["service_num"] == 2
-assert bfrombytes.canon_blocks[0].crc == b"\x29\x49"
+assert bfrombytes.canon_blocks[0].crc == b"\x55\x53"
 
 # Parse Bundle Age block
 assert bfrombytes.canon_blocks[1].blk_type == BlockType.BUNDLE_AGE
@@ -249,7 +291,7 @@ assert (
 )
 assert bfrombytes.canon_blocks[1].crc_type == CRCType.CRC16_X25
 assert bfrombytes.canon_blocks[1].bundle_age == 108000
-assert bfrombytes.canon_blocks[1].crc == b"\x5e\x0f"
+assert bfrombytes.canon_blocks[1].crc == b"\x3a\xed"
 
 # Parse Hop Count block
 assert bfrombytes.canon_blocks[2].blk_type == BlockType.HOP_COUNT
@@ -258,20 +300,35 @@ assert bfrombytes.canon_blocks[2].control_flags == BlockPCFlags.FRAG_REPLICATE
 assert bfrombytes.canon_blocks[2].crc_type == CRCType.CRC16_X25
 assert bfrombytes.canon_blocks[2].hop_limit == 15
 assert bfrombytes.canon_blocks[2].hop_count == 3
-assert bfrombytes.canon_blocks[2].crc == b"\x60\xb9"
+assert bfrombytes.canon_blocks[2].crc == b"\xf8\x13"
+
+# Parse Custody Transfer Extension block
+assert bfrombytes.canon_blocks[3].blk_type == BlockType.CUST_TRANS_EXT
+assert bfrombytes.canon_blocks[3].blk_num == 4
+assert bfrombytes.canon_blocks[3].control_flags == BlockPCFlags.REP_UNPROC
+assert bfrombytes.canon_blocks[3].crc_type == CRCType.CRC16_X25
+assert bfrombytes.canon_blocks[3].trans_id == 10
+assert bfrombytes.canon_blocks[3].trans_series_id == 2
+assert bfrombytes.canon_blocks[3].req_orig_eid.uri == 2
+assert bfrombytes.canon_blocks[3].req_orig_eid.ssp["node_num"] == 303
+assert bfrombytes.canon_blocks[3].req_orig_eid.ssp["service_num"] == 1
+assert bfrombytes.canon_blocks[3].crc == b"\x25\xc7"
 
 # Parse Payload block
-assert bfrombytes.canon_blocks[3].blk_type == BlockType.BUNDLE_PAYLOAD
-assert bfrombytes.canon_blocks[3].blk_num == 4
-assert bfrombytes.canon_blocks[3].control_flags == 0
-assert bfrombytes.canon_blocks[3].crc_type == CRCType.CRC16_X25
+assert bfrombytes.canon_blocks[5].blk_type == BlockType.BUNDLE_PAYLOAD
+assert bfrombytes.canon_blocks[5].blk_num == 5
+assert bfrombytes.canon_blocks[5].control_flags == 0
+assert bfrombytes.canon_blocks[5].crc_type == CRCType.CRC16_X25
 assert (
-    bfrombytes.canon_blocks[3].payload
+    bfrombytes.canon_blocks[5].payload
     == b"\x00\x00\x00\x00\x00\x00\x00\x0chello world\n"
 )
-bplib_payload_str = bfrombytes.canon_blocks[3].payload[8:].decode().strip()
+bplib_payload_str = bfrombytes.canon_blocks[5].payload[8:].decode().strip()
 assert bplib_payload_str == "hello world"
-assert bfrombytes.canon_blocks[3].crc == b"\x69\x56"
+assert bfrombytes.canon_blocks[5].crc == b"\x3b\x1e"
+
+read_bytes = bfrombytes.to_bytes()
+assert read_bytes == encoded
 
 # Step 10 : Write the bundle to a json file, then read the json file into a new
 # Bundle
@@ -280,75 +337,11 @@ bundle.to_json_file(filename)
 
 read_bundle = Bundle.from_json_file(filename)
 
-
 # Step 11: Verify the resulting bundle object is identical to the input
-# Parse Primary block
-assert read_bundle.pri_block.version == 7
-assert read_bundle.pri_block.control_flags == BundlePCFlags.MUST_NOT_FRAGMENT
-assert read_bundle.pri_block.crc_type == CRCType.CRC16_X25
-
-assert read_bundle.pri_block.dest_eid.uri == 2
-assert read_bundle.pri_block.dest_eid.ssp["node_num"] == 200
-assert read_bundle.pri_block.dest_eid.ssp["service_num"] == 1
-
-assert read_bundle.pri_block.src_eid.uri == 2
-assert read_bundle.pri_block.src_eid.ssp["node_num"] == 100
-assert read_bundle.pri_block.src_eid.ssp["service_num"] == 1
-
-assert read_bundle.pri_block.rpt_eid.uri == 2
-assert read_bundle.pri_block.rpt_eid.ssp["node_num"] == 100
-assert read_bundle.pri_block.rpt_eid.ssp["service_num"] == 1
-
-assert read_bundle.pri_block.creation_timestamp.time == 755533838904
-assert read_bundle.pri_block.creation_timestamp.sequence == 0
-
-assert read_bundle.pri_block.lifetime == 3600000
-assert read_bundle.pri_block.crc == b"\x0b\x19"
-
-# Parse Previous Node block
-assert read_bundle.canon_blocks[0].blk_type == BlockType.PREVIOUS_NODE
-assert read_bundle.canon_blocks[0].blk_num == 1
-assert read_bundle.canon_blocks[0].control_flags == 0
-assert read_bundle.canon_blocks[0].crc_type == CRCType.CRC16_X25
-assert read_bundle.canon_blocks[0].prev_eid.uri == 2
-assert read_bundle.canon_blocks[0].prev_eid.ssp["node_num"] == 300
-assert read_bundle.canon_blocks[0].prev_eid.ssp["service_num"] == 2
-assert read_bundle.canon_blocks[0].crc == b"\x29\x49"
-
-# Parse Bundle Age block
-assert read_bundle.canon_blocks[1].blk_type == BlockType.BUNDLE_AGE
-assert read_bundle.canon_blocks[1].blk_num == 2
-assert (
-    read_bundle.canon_blocks[1].control_flags
-    == BlockPCFlags.FRAG_REPLICATE | BlockPCFlags.DEL_UNPROC
-)
-assert read_bundle.canon_blocks[1].crc_type == CRCType.CRC16_X25
-assert read_bundle.canon_blocks[1].bundle_age == 108000
-assert read_bundle.canon_blocks[1].crc == b"\x5e\x0f"
-
-# Parse Hop Count block
-assert read_bundle.canon_blocks[2].blk_type == BlockType.HOP_COUNT
-assert read_bundle.canon_blocks[2].blk_num == 3
-assert read_bundle.canon_blocks[2].control_flags == BlockPCFlags.FRAG_REPLICATE
-assert read_bundle.canon_blocks[2].crc_type == CRCType.CRC16_X25
-assert read_bundle.canon_blocks[2].hop_limit == 15
-assert read_bundle.canon_blocks[2].hop_count == 3
-assert read_bundle.canon_blocks[2].crc == b"\x60\xb9"
-
-# Parse Payload block
-assert read_bundle.canon_blocks[3].blk_type == BlockType.BUNDLE_PAYLOAD
-assert read_bundle.canon_blocks[3].blk_num == 4
-assert read_bundle.canon_blocks[3].control_flags == 0
-assert read_bundle.canon_blocks[3].crc_type == CRCType.CRC16_X25
-assert (
-    read_bundle.canon_blocks[3].payload
-    == b"\x00\x00\x00\x00\x00\x00\x00\x0chello world\n"
-)
-bplib_payload_str = read_bundle.canon_blocks[3].payload[8:].decode().strip()
-assert bplib_payload_str == "hello world"
-assert read_bundle.canon_blocks[3].crc == b"\x69\x56"
-
 read_bytes = read_bundle.to_bytes()
+# Print the encoded bundle as a hex string
+print(f'New bundle encoded again:\n{codecs.encode(read_bytes,"hex")}\n')
+assert read_bytes == encoded
 
 # Print the encoded bundle as a hex string
-print(f'Read bundle encoded:\n{codecs.encode(read_bytes,"hex")}\n')
+print(f'Read JSON bundle encoded:\n{codecs.encode(read_bytes,"hex")}\n')

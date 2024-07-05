@@ -36,6 +36,8 @@ class BlockType(IntFlag):
     PREVIOUS_NODE = 6
     BUNDLE_AGE = 7
     HOP_COUNT = 10
+    CUST_TRANS_EXT = 15
+    COMP_RPT_EXT = 16
 
 
 class BundlePCFlags(IntFlag):
@@ -50,6 +52,17 @@ class BundlePCFlags(IntFlag):
     RPRT_FORWARDING = 65536
     RPRT_DELIVERY = 131072
     RPRT_DELETION = 262144
+
+
+class StatusRRFlags(IntFlag):
+    """Status Report Request Flags."""
+
+    RECEPTION = 1
+    FORWARDING = 2
+    DELIVERY = 4
+    DELETION = 32
+    FRAGMENTATION = 64
+    REASSEMBLY = 16384
 
 
 class CreationTimestamp:

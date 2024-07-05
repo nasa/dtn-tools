@@ -6,6 +6,8 @@ from .blocks import (
     HopCountBlock,
     PayloadBlock,
     PrevNodeBlock,
+    CustodyTransferBlock,
+    CompressedReportingBlock,
     PrimaryBlock,
 )
 from .bundle import Bundle
@@ -16,6 +18,7 @@ from .types import (
     BlockPCFlags,
     BlockType,
     BundlePCFlags,
+    StatusRRFlags,
     CRCFlag,
     CRCType,
     CreationTimestamp,
@@ -30,6 +33,7 @@ __all__ = [
     "BlockPCFlags",
     "BlockType",
     "BundlePCFlags",
+    "StatusRRFlags",
     "CRCFlag",
     "CRCType",
     "CreationTimestamp",
@@ -40,6 +44,8 @@ __all__ = [
     "HopCountBlock",
     "PayloadBlock",
     "PrevNodeBlock",
+    "CustodyTransferBlock",
+    "CompressedReportingBlock",
     "PrimaryBlock",
     # Bundle
     "Bundle",
