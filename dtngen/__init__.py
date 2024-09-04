@@ -9,6 +9,7 @@ from .blocks import (
     CustodyTransferBlock,
     CompressedReportingBlock,
     PrimaryBlock,
+    UnknownBlock,
 )
 from .bundle import Bundle
 from .types import (
@@ -22,6 +23,9 @@ from .types import (
     CRCFlag,
     CRCType,
     CreationTimestamp,
+    HopCountData,
+    CTEBData,
+    CREBData,
 )
 
 __all__ = [
@@ -37,6 +41,9 @@ __all__ = [
     "CRCFlag",
     "CRCType",
     "CreationTimestamp",
+    "HopCountData",
+    "CTEBData",
+    "CREBData",
     # Blocks
     "Block",
     "BundleAgeBlock",
@@ -47,6 +54,7 @@ __all__ = [
     "CustodyTransferBlock",
     "CompressedReportingBlock",
     "PrimaryBlock",
+    "UnknownBlock",
     # Bundle
     "Bundle",
 ]

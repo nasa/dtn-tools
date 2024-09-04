@@ -2,6 +2,7 @@ import json
 import traceback
 
 import cbor2
+import warnings
 
 from .blocks import (
     BundleAgeBlock,
@@ -11,6 +12,7 @@ from .blocks import (
     CustodyTransferBlock,
     CompressedReportingBlock,
     PrimaryBlock,
+    UnknownBlock,
 )
 from .dtnjson import custom_decoder
 from .types import BlockType
@@ -28,7 +30,7 @@ class Bundle:
         BlockType.COMP_RPT_EXT: CompressedReportingBlock,
     }
 
-    def __init__(self, pri_block, canon_blocks):
+    def __init__(self, pri_block = None, canon_blocks = None):
         """Initialize the bundle from a primary block and list of extension \
             blocks.
 
@@ -37,16 +39,6 @@ class Bundle:
         """
         self.pri_block = pri_block
         self.canon_blocks = canon_blocks
-
-    @classmethod
-    def get_block_cls(cls, block_type):
-        """Return the class associated with the requested block type.
-
-        :param int block_type: The block type to lookup
-        :return: A subclass of CanonicalBlock if the block type was supported, \
-            or None if not supported
-        """
-        return
 
     @classmethod
     def from_bytes(cls, cand_bundle):
@@ -61,18 +53,24 @@ class Bundle:
             cand_bundle = cbor2.loads(cand_bundle)
 
             # Attempt to decode the primary block
-            pri_block = PrimaryBlock.decode(cand_bundle[0])
-
-            # Attempt to decode each extension block by matching the block type
-            # flags
-            canon_blocks = []
-            for block in cand_bundle[1:]:
-                block_type = block[0]
-                block_cls = cls._block_lookup.get(block_type, None)
-                if block_cls:
-                    canon_blocks.append(block_cls.decode(block))
-                else:
-                    print(f"WARNING: Unknown block type {block_type}. Skipping block.")
+            pri_block = None
+            canon_blocks = None
+            
+            if isinstance(cand_bundle, list) and len(cand_bundle) >=1:
+                pri_block = PrimaryBlock.decode(cand_bundle[0])
+    
+                # Attempt to decode each extension block by matching the block type
+                # flags
+                canon_blocks = []
+                for block in cand_bundle[1:]:
+                    block_type = block[0]
+                    block_cls = cls._block_lookup.get(block_type, None)
+                    if block_cls:
+                        canon_blocks.append(block_cls.decode(block))
+                    else:
+                        warnmsg = f'Unknown block type {block_type}. Adding as UnknownBlock.'
+                        warnings.warn(warnmsg)
+                        canon_blocks.append(UnknownBlock.decode(block))
 
             return Bundle(pri_block, canon_blocks)
 
@@ -102,9 +100,14 @@ class Bundle:
         :return: A CBOR-encoded bundle
         :rtype: bytearray
         """
-        byte_string = self.pri_block.encode()
-        for cblock in self.canon_blocks:
-            byte_string = byte_string + cblock.encode()
+        byte_string = self.pri_block.encode() if self.pri_block is not None \
+            else b''
+        
+        if self.canon_blocks is not None \
+                and isinstance(self.canon_blocks, list) \
+                and len(self.canon_blocks) >= 1:
+            for cblock in self.canon_blocks:
+                byte_string = byte_string + cblock.encode()
 
         # return byte string wrapped by 0x9F and 0xFF to make it an indefinite
         # cbor array - cbor2 only does this for you if it's a long array
@@ -124,10 +127,18 @@ class Bundle:
         :return: A json-encoded bundle
         :rtype: str
         """
-        json_string = "[" + self.pri_block.to_json() + ", "
-        for cblock in self.canon_blocks[:-1]:
-            json_string = json_string + cblock.to_json() + ", "
-        json_string = json_string + self.canon_blocks[-1].to_json() + "]"
+        json_string = "[" + self.pri_block.to_json() \
+            if self.pri_block is not None else "["
+        if self.canon_blocks is not None \
+                and isinstance(self.canon_blocks, list) \
+                and len(self.canon_blocks) >= 1:
+            if self.pri_block is not None:
+                json_string = json_string  + ", "
+            for cblock in self.canon_blocks[:-1]:
+                json_string = json_string + cblock.to_json() + ", "
+            json_string = json_string + self.canon_blocks[-1].to_json() + "]"
+        else:
+            json_string = json_string + "]"
 
         # Pretty print the json
         parsed = json.loads(json_string)
@@ -150,26 +161,36 @@ class Bundle:
         :rtype: Bundle
         """
         jsondata = json.loads(jsonstr, object_hook=custom_decoder)
-        pri_block = PrimaryBlock(*jsondata[0])
 
-        canon_blocks = []
-        for block in jsondata[1:]:
-            block_type = block[0]
-            block_cls = cls._block_lookup.get(block_type, None)
-            if block_cls:
-                if block_cls == HopCountBlock \
-                        or block_cls == CustodyTransferBlock \
-                        or block_cls == CompressedReportingBlock:
-                    block = _flatten(block)
-                if block_cls == CompressedReportingBlock:
-                    if block[3] >= 1:
-                        crc_val = block[-1]
-                        block = block[:-1]
-                        canon_blocks.append(block_cls(*block, crc=crc_val))
+        pri_block = None
+        canon_blocks = None
+        
+        if isinstance(jsondata, list) and len(jsondata) >=1:
+            pri_block = PrimaryBlock(*jsondata[0])
+    
+            canon_blocks = []
+            for block in jsondata[1:]:
+                block_type = block[0]
+                block_cls = cls._block_lookup.get(block_type, None)
+                if block_cls:
+                    if block_cls == HopCountBlock \
+                            or block_cls == CustodyTransferBlock \
+                            or block_cls == CompressedReportingBlock:
+                        block = _flatten(block)
+                    if block_cls == CompressedReportingBlock:
+                        if len(block) >= 4 and isinstance(block[3], int) \
+                            and block[3] >= 1 and block[3] <= 2:
+                                crc_val = block[-1]
+                                block = block[:-1]
+                                canon_blocks.append(block_cls(*block, crc=crc_val))
+                        else:
+                            canon_blocks.append(block_cls(*block))
+                    else:
+                        canon_blocks.append(block_cls(*block))
                 else:
-                    canon_blocks.append(block_cls(*block))
-            else:
-                print(f"WARNING: Unknown block type {block_type}. Skipping block.")
+                    warnmsg = f'Unknown block type {block_type}. Adding as UnknownBlock.'
+                    warnings.warn(warnmsg)
+                    canon_blocks.append(UnknownBlock.decode(block))
 
         return Bundle(pri_block, canon_blocks)
 
