@@ -3,6 +3,7 @@ import traceback
 
 import cbor2
 import warnings
+import time
 
 from .blocks import (
     BundleAgeBlock,
@@ -206,6 +207,36 @@ class Bundle:
             json_string = json_file.read()
         return cls.from_json(json_string)
 
+    @classmethod
+    def generate(cls, pri_settings=None, canon_settings=None, num_bundles=1):
+        """Generate one or more bundles based on the provided settings.
+
+        :param PrimaryBlockSettings pri_settings: The settings for the primary \
+            block - can be None
+        :param list canon_settings: List of canonical block settings instances \
+            - can be None
+        :param int num_bundles: Number of bundles to generate
+        :return: list of generated bundles
+        :rtype: list
+        """
+        bundles = []
+        for bundle_num in range(num_bundles):
+            pri_block = None
+            canon_blocks = None
+            
+            if pri_settings is not None:
+                # Generate Primary Block
+                pri_block = pri_settings.generate(bundle_num=bundle_num)
+            
+            if canon_settings is not None:
+                canon_blocks = []
+                # generate Canonical Blocks
+                for curr_block_settings in canon_settings:
+                    canon_blocks.append(curr_block_settings.generate(bundle_num=bundle_num))
+            
+            bundles.append(Bundle(pri_block, canon_blocks))
+        return bundles
+        
 
 def _flatten(non_flat_list):
     flat = []

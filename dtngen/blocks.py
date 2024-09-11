@@ -1,14 +1,15 @@
 import json
 from abc import ABC
-
 import cbor2
 from itertools import zip_longest
+import warnings
+import os
+import datetime
 
 from .dtnjson import custom_encoder
 from .types import EID, CRCFlag, CreationTimestamp, HopCountData, CTEBData, \
     CREBData, calc_crc, default_encoder
 
-import warnings
 
 class Block(ABC):
     """RFC9171 Block."""
@@ -18,7 +19,7 @@ class Block(ABC):
         """Attempt to decode the block.
 
         :param list cand_block: A list of objects to be interpreted as a \
-            primary block.
+            block.
         """
         # I initially tried @abstractmethod, but Python doesn't seem to enforce abstract
         # class methods until an object is instantiated. We have to throw this exception to guarantee all
@@ -34,11 +35,12 @@ class CanonicalBlock(Block):
     def __init__(self, blk_type=None, blk_num=None, control_flags=None, crc_type=None, crc=None):
         """Initialize the extension block with the requested fields.
 
-        :param BlockType blk_type: the type of Canonical block
-        :param int blk_num: block number
-        :param BlockPCFlags control_flags: block processing control flags
-        :param CRCType crc_type: CRC type
-        :param int crc: (optional) crc value or CRCFlag.CALCULATE to \
+        :param BlockType blk_type: (optional) the type of Canonical block
+        :param int blk_num: (optional) block number
+        :param BlockPCFlags control_flags: (optional) block processing control \
+            flags
+        :param CRCType crc_type: (optional) CRC type
+        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
             calculate it
         """
         self.blk_type = blk_type
@@ -161,12 +163,14 @@ class PrevNodeBlock(CanonicalBlock):
         crc=None):
         """Initialze the previous node block with the requested fields.
 
-        :param BlockType blk_type: the type of Canonical block
-        :param int blk_num: block number
-        :param BlockPCFlags control_flags: block processing control flags
-        :param CRCType crc_type: CRC type
-        :param EID prev_eid: node that forwarded this bundle to the local node
-        :param int crc: (optional) crc value or CRCFlag.CALCULATE to \
+        :param BlockType blk_type: (optional) the type of Canonical block
+        :param int blk_num: (optional) block number
+        :param BlockPCFlags control_flags: (optional) block processing control \
+            flags
+        :param CRCType crc_type: (optional) CRC type
+        :param EID prev_eid: (optional) node that forwarded this bundle to the \
+            local node
+        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
             calculate it
         """
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
@@ -202,6 +206,9 @@ class PrevNodeBlock(CanonicalBlock):
 
         :params list cand_block: A list of objects to be interpreted as a \
             Previous Node Block.
+            
+        :return: A Previous Node Block
+        :rtype: PrevNodeBlock
         """
         canon_fields = CanonicalBlock.decode_common(cand_block)
         
@@ -231,13 +238,15 @@ class BundleAgeBlock(CanonicalBlock):
     ):
         """Initialze the bundle age block with the requested fields.
 
-        :param BlockType blk_type: the type of Canonical block
-        :param int blk_num: block number
-        :param BlockPCFlags control_flags: block processing control flags
-        :param CRCType crc_type: CRC type
-        :param int bundle_age: number of milliseconds elapsed between time \
-            bundle was created and time it was most recently forwarded
-        :param int crc: (optional) crc value or CRCFlag.CALCULATE to \
+        :param BlockType blk_type: (optional) the type of Canonical block
+        :param int blk_num: (optional) block number
+        :param BlockPCFlags control_flags: (optional) block processing control \
+            flags
+        :param CRCType crc_type: (optional) CRC type
+        :param int bundle_age: (optional) number of milliseconds elapsed \
+            between time bundle was created and time it was most recently \
+            forwarded
+        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
             calculate it
         """
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
@@ -273,6 +282,9 @@ class BundleAgeBlock(CanonicalBlock):
 
         :params list cand_block: A list of objects to be interpreted as a \
             Bundle Age Block.
+            
+        :return: A Bundle Age Block
+        :rtype: BundleAgeBlock
         """
         canon_fields = CanonicalBlock.decode_common(cand_block)
 
@@ -301,15 +313,14 @@ class HopCountBlock(CanonicalBlock):
     ):
         """Initialize the hop count block with the requested fields.
 
-        :param BlockType blk_type: the type of Canonical block
-        :param int blk_num: block number
-        :param BlockPCFlags control_flags: block processing control flags
-        :param CRCType crc_type: CRC type
-        :param HopCountData hop_data: hop_limit after which it should be deleted and \
-            hop_count number of times bundle was forward from one node to \
-            another
-        :param int crc: (optional) crc value or CRCFlag.CALCULATE to \
-            calculate it
+        :param BlockType blk_type: (optional) the type of Canonical block
+        :param int blk_num: (optional) block number
+        :param BlockPCFlags (optional) control_flags: block processing control flags
+        :param CRCType crc_type: (optional) CRC type
+        :param HopCountData hop_data: (optional) hop_limit after which it \
+            should be deleted and hop_count number of times bundle was forward \
+            from one node to another
+        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to calculate it
         """
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
         self.hop_data = hop_data
@@ -342,8 +353,11 @@ class HopCountBlock(CanonicalBlock):
     def decode(cls, cand_block):
         """Attempt to decode the candidate block as a BPv7 Hop Count Block.
 
-        :params list cand_block: A list of objects to be interpreted as a \
-            Hop Count Block.
+        :params list cand_block: A list of objects to be interpreted as a Hop \
+            Count Block.
+            
+        :return: A Hop Count Block
+        :rtype: HopCountBlock
         """
         canon_fields = CanonicalBlock.decode_common(cand_block)
 
@@ -374,14 +388,15 @@ class CustodyTransferBlock(CanonicalBlock):
         """Initialize the custody transfer extension block with the requested \
             fields.
 
-        :param BlockType blk_type: the type of Canonical block
-        :param int blk_num: block number
-        :param BlockPCFlags control_flags: block processing control flags
-        :param CRCType crc_type: CRC type
-        :param CTEBData cteb_data: trans_id identifier for the custody signal, \
-            trans_series_id intentifier for a transmission series \
-            reg_orig_eid EID of the originator of the custody request
-        :param int crc: (optional) crc value or CRCFlag.CALCULATE to \
+        :param BlockType blk_type: (optional) the type of Canonical block
+        :param int blk_num: (optional) block number
+        :param BlockPCFlags (optional) control_flags: block processing control \
+            flags
+        :param CRCType crc_type: (optional) CRC type
+        :param CTEBData cteb_data: (optional) trans_id identifier for the \
+            custody signal, trans_series_id intentifier for a transmission \
+            series reg_orig_eid EID of the originator of the custody request
+        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
             calculate it
         """
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
@@ -418,6 +433,9 @@ class CustodyTransferBlock(CanonicalBlock):
 
         :params list cand_block: A list of objects to be interpreted as a \
             Custody Transfer Extension Block.
+            
+        :return: A Custody Transfer Extension Block
+        :rtype: CustodyTransferBlock
         """
         canon_fields = CanonicalBlock.decode_common(cand_block)
 
@@ -445,26 +463,20 @@ class CompressedReportingBlock(CanonicalBlock):
     def __init__(
         self, blk_type=None, blk_num=None, control_flags=None, crc_type=None, \
             creb_data=None, crc=None
-#         self, blk_type, blk_num, control_flags, crc_type, bundle_seq_num, \
-#             bundle_seq_id=None, rpt_request_flags=None, scope_node_id=None, \
-#             rpt_eid=None, crc=None
     ):
-        """Initialize the compress reporting extension block with the \
+        """Initialize the compressed reporting extension block with the \
             requested fields. For the block-type-specific fields, if one is \
             provided, all prior ones must also be provided. For example, if \
             rpt_request_flags is provided, then both bundle_seq_id and \
             bundle_seq_num must be provided as well.
 
-        :param BlockType blk_type: the type of Canonical block
-        :param int blk_num: block number
-        :param BlockPCFlags control_flags: block processing control flags
-        :param CRCType crc_type: CRC type
-        :param int bundle_seq_num: bundle sequence number
-        :param int bundle_seq_id: bundle sequence identifier
-        :param int rpt_request_flags: status report request flags
-        :param int scope_node_id: EID of the node that created the CREB
-        :param int rpt_eid: EID of the node to send the reports to
-        :param int crc: (optional) crc value or CRCFlag.CALCULATE to \
+        :param BlockType blk_type: (optional) the type of Canonical block
+        :param int blk_num: (optional) block number
+        :param BlockPCFlags control_flags: (optional) block processing control \
+            flags
+        :param CRCType crc_type: (optional) CRC type
+        :param CREBData creb_data: (optional) The CREB type-specific data
+        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
             calculate it
         """
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
@@ -501,6 +513,9 @@ class CompressedReportingBlock(CanonicalBlock):
 
         :params list cand_block: A list of objects to be interpreted as a \
             Compressed Reporting Extension Block.
+            
+        :return: A Compressed Reporting Extension Block
+        :rtype: CompressedReportingBlock
         """
         canon_fields = CanonicalBlock.decode_common(cand_block)
 
@@ -529,12 +544,13 @@ class PayloadBlock(CanonicalBlock):
         crc=None):
         """Initialze the payload block with the requested fields.
 
-        :param BlockType blk_type: the type of Canonical block
-        :param int blk_num: block number
-        :param BlockPCFlags control_flags: block processing control flags
-        :param CRCType crc_type: CRC type
-        :param bytes payload: the bundle payload
-        :param int crc: (optional) crc value or CRCFlag.CALCULATE to \
+        :param BlockType blk_type: (optional) the type of Canonical block
+        :param int blk_num: (optional) block number
+        :param BlockPCFlags control_flags: (optional) block processing control \
+            flags
+        :param CRCType crc_type: (optional) CRC type
+        :param bytes payload: (optional) the bundle payload
+        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
             calculate it
         """
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
@@ -635,6 +651,9 @@ class PayloadBlock(CanonicalBlock):
 
         :params list cand_block: A list of objects to be interpreted as a \
             Payload Block.
+            
+        :return: A Payload Block
+        :rtype: PayloadBlock
         """
         canon_fields = CanonicalBlock.decode_common(cand_block)
         
@@ -644,6 +663,61 @@ class PayloadBlock(CanonicalBlock):
             tmp = cand_block[4]
             
         return PayloadBlock(**canon_fields, payload=tmp)
+
+
+class PayloadBlockSettings:
+    """Class to represent settings for RFC-9171 Payload Block generation."""
+
+    MAX_PAYLOAD_SIZE = 10*1024*1024     # Maximum payload currently is 10 MB
+
+    def __init__(self, blk_type=None, blk_num=None, control_flags=None, 
+        crc_type=None, payload=None, crc=None):
+        """Initialze the payload block with the requested fields.
+
+        :param BlockType blk_type: (optional) the type of Canonical block
+        :param int blk_num: (optional) block number
+        :param BlockPCFlags control_flags: (optional) block processing control \
+            flags
+        :param CRCType crc_type: (optional) CRC type
+        :param dict payload: (optional) {"size": <payload size>} "size" key \
+            with payload size in bytes to generate
+        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
+            calculate it
+        """
+        self.blk_type = blk_type
+        self.blk_num = blk_num
+        self.control_flags = control_flags
+        self.crc_type = crc_type
+        self.crc = crc
+        
+        if isinstance(payload, dict) and "size" in payload \
+                and isinstance(payload["size"], int):
+            self.payload_size = payload["size"]
+            
+            if self.payload_size > PayloadBlockSettings.MAX_PAYLOAD_SIZE:
+                warnmsg = f'Specified payload size {self.payload_size} is \
+larger than the MAX_PAYLOAD_SIZE of {PayloadBlockSettings.MAX_PAYLOAD_SIZE}'
+                warnings.warn(warnmsg)
+        else:
+            raise ValueError("payload settings not provided or does not \
+contain \"size\" key with int value")
+
+    def generate(self, bundle_num):
+        """Generate a payload block with the settings in this \
+            PayloadBundleSettings. bundle_num is ignored.
+        
+        :param int bundle_num: the number of the bundle being generated \
+            (0 to ...)
+
+        :return: The generated Payload block
+        :rtype: PayloadBlock
+        """
+        # generate a random byte string payload of the specified size in bytes
+        generated_payload = os.urandom(self.payload_size)
+
+        return PayloadBlock(blk_type=self.blk_type, blk_num=self.blk_num,
+            control_flags=self.control_flags, crc_type=self.crc_type, 
+            payload=generated_payload, crc=self.crc)
 
 
 class PrimaryBlock(Block):
@@ -663,19 +737,23 @@ class PrimaryBlock(Block):
     ):
         """Initialize the primary block with the requested fields.
 
-        :param int version: version of the Bundle Protocol that constructed \
-            this block
-        :param BundlePCFlags control_flags: bundle processing control flags
-        :param CRCType crc_type: CRC type
-        :param EID dest_eid: bundle endpoint that is the bundle's destination
-        :param EID src_eid: bundle node at which the bundle was initially \
-            transmitted, or null endpoint if anomymous
-        :param EID rpt_eid: bundle endpoint to which status reports pertaining \
-            to the forwarding and delivery of this bundle are to be transmitted
-        :param CreationTimestamp creation_timestamp: creation timestamp
-        :para int lifetime: number of milliseconds past the creation time at \
-            which the bundle's payload will no longer be useful
-        :param int crc: (optional) crc value or CRCFlag.CALCULATE to \
+        :param int version: (optional) version of the Bundle Protocol that \
+            constructed this block
+        :param BundlePCFlags control_flags: (optional) bundle processing \
+            control flags
+        :param CRCType crc_type: (optional) CRC type
+        :param EID dest_eid: (optional) bundle endpoint that is the bundle's \
+            destination
+        :param EID src_eid: (optional) bundle node at which the bundle was \
+            initially transmitted, or null endpoint if anomymous
+        :param EID rpt_eid: (optional) bundle endpoint to which status reports \
+            pertaining to the forwarding and delivery of this bundle are to be \
+            transmitted
+        :param CreationTimestamp creation_timestamp: (optional) creation \
+            timestamp
+        :param int lifetime: (optional) number of milliseconds past the \
+            creation time at which the bundle's payload will no longer be useful
+        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
             calculate it
         """
         self.version = version
@@ -772,9 +850,10 @@ class PrimaryBlock(Block):
 
         :params list cand_block: A list of objects to be interpreted as a \
             Primary Block.
+            
+        :return: A Primary Block
+        :rtype: PrimaryBlock
         """
-        # TODO: Length checks
-        
         blen = len(cand_block)
         
         if blen > 9:
@@ -792,6 +871,141 @@ class PrimaryBlock(Block):
             cand_block[6] = CreationTimestamp.decode(cand_block[6])
 
         return PrimaryBlock(*cand_block)            
+
+
+class PrimaryBlockSettings:
+    """Settings to generate RFC9171 Primary Blocks."""
+
+    def __init__(self,
+        version=None,
+        control_flags=None,
+        crc_type=None,
+        dest_eid=None,
+        src_eid=None,
+        rpt_eid=None,
+        creation_timestamp=None,
+        lifetime=None,
+        crc=None,
+    ):
+        """Initialize the primary block with the requested fields.
+
+        :param int version: (optional) version of the Bundle Protocol that \
+            constructed this block
+        :param BundlePCFlags control_flags: (optional) bundle processing \
+            control flags
+        :param CRCType crc_type: (optional) CRC type
+        :param EID dest_eid: (optional) bundle endpoint that is the bundle's \
+            destination
+        :param EID src_eid: (optional) bundle node at which the bundle was \
+            initially transmitted, or null endpoint if anomymous
+        :param EID rpt_eid: (optional) bundle endpoint to which status reports \
+            pertaining to the forwarding and delivery of this bundle are to be \
+            transmitted
+        :param dict creation_timestamp: (optional) creation timestamp \
+                generation settings\n
+            {\n
+                "time": "current" or {"start": <start_time>, "increment": \
+                    <ms between bundles>},\n
+                "sequence": {"start": <start value>} or {"fixed": <fixed value>}\n
+            }
+        :param int lifetime: (optional) number of milliseconds past the \
+            creation time at which the bundle's payload will no longer be useful
+        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
+            calculate it
+        """
+        self.version = version
+        self.control_flags = control_flags
+        self.crc_type = crc_type
+        self.dest_eid = dest_eid
+        self.src_eid = src_eid
+        self.rpt_eid = rpt_eid
+        self.lifetime = lifetime
+        self.crc = crc
+        
+        self.cts_time_current = False
+        self.cts_time_start = None
+        self.cts_time_increment = None
+        
+        self.cts_seq_fixed = False
+        self.cts_seq_start = None
+        
+        if creation_timestamp and isinstance(creation_timestamp, dict):
+            if isinstance(creation_timestamp["time"], str) \
+                    and creation_timestamp["time"].lower() == "current":
+                self.cts_time_current = True
+            
+            if not self.cts_time_current \
+                    and isinstance(creation_timestamp["time"], dict):
+                if "start" in creation_timestamp["time"] \
+                        and isinstance(creation_timestamp["time"]["start"], int):
+                    self.cts_time_start = creation_timestamp["time"]["start"]
+                if "increment" in creation_timestamp["time"] \
+                        and isinstance(creation_timestamp["time"]["increment"], int):
+                    self.cts_time_increment = creation_timestamp["time"]["increment"]
+
+            if "sequence" in creation_timestamp \
+                    and isinstance(creation_timestamp["sequence"], dict):
+                if "fixed" in creation_timestamp["sequence"]:
+                    self.cts_seq_fixed = True
+                    if isinstance(creation_timestamp["sequence"]["fixed"], int):
+                        self.cts_seq_start = \
+                            creation_timestamp["sequence"]["fixed"]
+                elif "start" in creation_timestamp["sequence"] \
+                        and isinstance(creation_timestamp["sequence"]["start"], int):
+                    self.cts_seq_start = creation_timestamp["sequence"]["start"]
+
+        else:
+            raise ValueError("creation_timestamp not provided or not a dict with settings")
+
+        if not self.cts_time_current:
+            if not (self.cts_time_start and self.cts_time_increment):
+                raise ValueError("creation_timestamp \"time\" is not \"current\" \
+and \"start\" and/or \"increment\" not provided or are not ints")
+                    
+        if self.cts_seq_fixed:
+            if self.cts_seq_start is None:
+                raise ValueError("creation_timestamp \"sequence\" type is \
+fixed, but \"fixed\" value is not an int")
+        else:
+            if self.cts_seq_start is None:
+                raise ValueError("creation_timestamp \"sequence\" \"start\" \
+value is not an int")
+
+    def generate(self, bundle_num):
+        """Generate a Primary Block with the settings in this \
+            PayloadBundleSettings and the given bundle number.
+        
+        :param int bundle_num: the number of the bundle being generated \
+            (0 to ...)
+
+        :return: The generated Primary block
+        :rtype: PrimaryBlock
+        """
+
+        if self.cts_time_current:
+            # The difference in milliseconds between the UTC epoch and the
+            # dtn epoch is 946684800000
+            generated_time = int(datetime.datetime.now().timestamp() * 1000) \
+                - 946684800000
+        else:
+            generated_time = self.cts_time_start \
+                + self.cts_time_increment*bundle_num
+                
+        generated_seq = self.cts_seq_start \
+            + (0 if self.cts_seq_fixed else bundle_num)
+            
+        return PrimaryBlock(
+            version=self.version,
+            control_flags=self.control_flags,
+            crc_type=self.crc_type,
+            dest_eid=self.dest_eid,
+            src_eid=self.src_eid,
+            rpt_eid=self.rpt_eid,
+            creation_timestamp=CreationTimestamp({"time": generated_time, \
+                "sequence": generated_seq}),
+            lifetime=self.lifetime,
+            crc=self.crc,
+        )
 
 
 class UnknownBlock(Block):

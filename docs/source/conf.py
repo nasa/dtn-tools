@@ -20,6 +20,7 @@ autoapi_dirs = ["../../dtngen"]
 templates_path = ["_templates"]
 exclude_patterns = []
 
+autoapi_options = [ 'members', 'undoc-members', 'private-members', 'show-inheritance-diagram', 'show-module-summary', 'imported-members', ]
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
@@ -33,16 +34,19 @@ def skip_what(app, what, name, obj, skip, options):
     # Usually, starting with _ indicates a desire for private implementation
     # This isn't perfect, but it's close enough
     what_name = name.split(".")[-1]
-
+    
     if what == "data":
         if what_name.startswith("_"):
-            return True
+            skip = True
 
     if what == "function" or what == "method":
+        if what_name.startswith("__") and what_name.endswith("__"):
+            skip = False
         # Attempt at a "private" function
-        if what_name.startswith("_"):
-            if not (what_name.startswith("__") and what_name.endswith("__")):
-                return True
+        elif what_name.startswith("_"):
+            skip = True
+    
+    return skip
 
 
 def setup(sphinx):

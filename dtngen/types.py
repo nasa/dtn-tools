@@ -68,29 +68,6 @@ class StatusRRFlags(IntFlag):
     REASSEMBLY = 16384
 
 
-class CreationTimestamp:
-    """Creation Timestamp."""
-
-    def __init__(self, timestamp_fields):
-        """Initialize the Creation Timestamp.
-
-        :param dict timestamp_fields: Timestamp Fields
-        """
-        self.time = timestamp_fields["time"]
-        self.sequence = timestamp_fields["sequence"]
-
-    @classmethod
-    def decode(cls, cand_timestamp):
-        """Attempt to parse a Creation Timestamp.
-
-        :param list cand_timestamp: A list of fields representing a Creation Timestamp
-        """
-        if len(cand_timestamp) != 2:
-            raise ValueError("Creation Timestamp should have exactly 2 fields.")
-        timestamp_d = {"time": cand_timestamp[0], "sequence": cand_timestamp[1]}
-        return CreationTimestamp(timestamp_d)
-
-
 class CRCType(IntFlag):
     """BPv7 Supported CRC Types."""
 
@@ -102,7 +79,6 @@ class CRCType(IntFlag):
 class CRCFlag(IntEnum):
     """Flag to indicate if CRC should be calculated."""
 
-    NONE = -2
     CALCULATE = -1
 
 
