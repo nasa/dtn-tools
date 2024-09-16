@@ -23,7 +23,24 @@ from dtngen import (
     PrimaryBlockSettings,
     PrimaryBlock,
     UnknownBlock,
+    TypeWarning,
 )
+
+import warnings
+
+# Display every warning - by default it only shows the first warning of the type
+# and message content, from a specific line of code. Or set it to "ignore" to
+# not display any warnings or to "default" to get the default behavior
+# (or comment out all simplefilter lines).
+warnings.simplefilter("always")
+
+# Use one or both of these instead to filter out that type of warning.
+# TypeWarnings are warnings about types of __init__ parameters for blocks.
+# UserWarnings are other warnings such as the block number of the PayloadBlock
+# not being 1 or an unknown block type when decoding bytes or json. You can set
+# them instead to "default" or "always" as above.
+# warnings.simplefilter("ignore", TypeWarning)
+# warnings.simplefilter("ignore", UserWarning)
 
 
 def recv_candidate_bundle():
@@ -943,3 +960,52 @@ print ("-------------------------------")
 for x in generated_bundles:
     print(f'Payload size: {len(x.canon_blocks[0].payload)} bytes')
     print(f'Creation Time: {x.pri_block.creation_timestamp.time}\n')
+
+
+primary_block = PrimaryBlock(
+    version=7,
+    control_flags=BundlePCFlags.MUST_NOT_FRAGMENT,
+    crc_type=CRCType.CRC16_X25,
+    dest_eid=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
+    src_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+    rpt_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+    creation_timestamp=CreationTimestamp({"time": 755533838904, "sequence": 0}),
+    lifetime=3600000,
+    crc=b"\x0b\x19",
+)
+
+# Create a payload block with payload that is not bytes (which is invalid)
+payload_block = PayloadBlock(
+    blk_type=BlockType.BUNDLE_PAYLOAD,
+    blk_num=1,
+    control_flags=0,
+    crc_type=1,
+    payload=0x1234,
+    crc="hello",
+)
+
+# Use it to create a bundle object
+badpayloadbundle = Bundle(
+    pri_block=primary_block,
+    canon_blocks=[payload_block],
+)
+
+# get it as bytes
+badpayloadbundlebytes = badpayloadbundle.to_bytes()
+print(f'badpayloadbundlebytes =\n{codecs.encode(badpayloadbundlebytes,"hex")}')
+
+# decode it and get as bytes again
+badpayloadbundleback = Bundle.from_bytes(badpayloadbundlebytes)
+badpayloadbundlebytesagain = badpayloadbundleback.to_bytes()
+print(f'\nbadpayloadbundlebytesagain =\n{codecs.encode(badpayloadbundlebytesagain,"hex")}')
+
+# Make sure they are the same
+assert(badpayloadbundlebytes == badpayloadbundlebytesagain)
+
+# Verify that the payload is (incorrectly) a CBOR encoded unsigned integer
+# instead of a byte string
+ba = bytearray(badpayloadbundlebytesagain)
+print(f'\nbadpayload = {codecs.encode(ba[47:50], "hex")}')
+assert(ba[47] == 0x19)   # A CBOR unsigned int in two bytes (additional info 25)
+assert(ba[48] == 0x12)
+assert(ba[49] == 0x34)

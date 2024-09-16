@@ -15,6 +15,7 @@ from .blocks import (
 )
 from .bundle import Bundle
 from .types import (
+    TypeWarning,
     EID,
     AdminRecord,
     AdminRecordType,
@@ -33,6 +34,7 @@ from .types import (
 __all__ = [
     "__version__",
     # Types
+    "TypeWarning",
     "EID",
     "AdminRecord",
     "AdminRecordType",

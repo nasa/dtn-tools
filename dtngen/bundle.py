@@ -35,8 +35,8 @@ class Bundle:
         """Initialize the bundle from a primary block and list of extension \
             blocks.
 
-        :param PrimaryBlock pri_block: The primary block of the bundle.
-        :param list canon_blocks: A list of blocks derived from CanonicalBlock
+        :param PrimaryBlock pri_block: (optional) The primary block of the bundle.
+        :param list canon_blocks: (optional) A list of blocks derived from CanonicalBlock
         """
         self.pri_block = pri_block
         self.canon_blocks = canon_blocks
@@ -211,11 +211,12 @@ class Bundle:
     def generate(cls, pri_settings=None, canon_settings=None, num_bundles=1):
         """Generate one or more bundles based on the provided settings.
 
-        :param PrimaryBlockSettings pri_settings: The settings for the primary \
-            block - can be None
-        :param list canon_settings: List of canonical block settings instances \
-            - can be None
-        :param int num_bundles: Number of bundles to generate
+        :param PrimaryBlockSettings pri_settings: (optional) The settings for \
+            the primary block
+        :param list canon_settings: (optional) List of canonical block \
+            settings instances
+        :param int num_bundles: (optional) Number of bundles to generate - \
+            defaults to 1
         :return: list of generated bundles
         :rtype: list
         """

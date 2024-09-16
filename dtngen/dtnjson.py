@@ -39,7 +39,7 @@ def custom_encoder(x):
                 "rpt_eid": x.rpt_eid},
         }
     else:
-        raise TypeError
+        raise TypeError(f'Object of type {type(x)} is not JSON serializable')
 
 
 def custom_decoder(x):

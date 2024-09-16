@@ -7,7 +7,8 @@ import os
 import datetime
 
 from .dtnjson import custom_encoder
-from .types import EID, CRCFlag, CreationTimestamp, HopCountData, CTEBData, \
+from .types import TypeWarning, BlockType, BlockPCFlags, BundlePCFlags, \
+    CRCType, CRCFlag, EID, CRCFlag, CreationTimestamp, HopCountData, CTEBData, \
     CREBData, calc_crc, default_encoder
 
 
@@ -43,10 +44,31 @@ class CanonicalBlock(Block):
         :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
             calculate it
         """
+        cclass_name = self.__class__.__name__
+        
+        if not isinstance(blk_type, BlockType) and not isinstance(blk_type, int):
+            warnmsg = f'{cclass_name} blk_type is type {type(blk_type).__name__} instead of BlockType or int'
+            warnings.warn(warnmsg, TypeWarning)
         self.blk_type = blk_type
+        
+        if not isinstance(blk_num, int):
+            warnmsg = f'{cclass_name} blk_num is type {type(blk_num).__name__} instead of int'
+            warnings.warn(warnmsg, TypeWarning)
         self.blk_num = blk_num
+        
+        if not isinstance(control_flags, BlockPCFlags) and not isinstance(control_flags, int):
+            warnmsg = f'{cclass_name} control_flags is type {type(control_flags).__name__} instead of BlockPCFlags or int'
+            warnings.warn(warnmsg, TypeWarning)
         self.control_flags = control_flags
+        
+        if not isinstance(crc_type, CRCType) and not isinstance(crc_type, int):
+            warnmsg = f'{cclass_name} crc_type is type {type(crc_type).__name__} instead of CRCType or int'
+            warnings.warn(warnmsg, TypeWarning)
         self.crc_type = crc_type
+        
+        if not isinstance(crc, CRCFlag) and not isinstance(crc, bytes) and crc is not None:
+            warnmsg = f'{cclass_name} crc is type {type(crc).__name__} instead of CRCFlag, bytes or None'
+            warnings.warn(warnmsg, TypeWarning)
         self.crc = crc
 
         # CRC
@@ -58,6 +80,9 @@ class CanonicalBlock(Block):
         :param list cand_block: A list representing the candidate Canonical \
             Block
         """
+        if not isinstance(cand_block, list):
+            raise ValueError("Candidate Canonical Block is not a list")
+            
         blen = len(cand_block)
         
         if blen > 6:
@@ -88,7 +113,7 @@ class CanonicalBlock(Block):
         if type_spec_data is not None:
             if not isinstance(type_spec_data, bytes):
                 type_spec_data = cbor2.dumps(type_spec_data, \
-                default=default_encoder)
+                    default=default_encoder)
         
         if self.crc is CRCFlag.CALCULATE and self.crc_type is not None \
             and self.crc_type >= 1 and self.crc_type <= 2:
@@ -174,6 +199,10 @@ class PrevNodeBlock(CanonicalBlock):
             calculate it
         """
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
+
+        if not isinstance(prev_eid, EID):
+            warnmsg = f'PrevNodeBlock prev_eid is type {type(prev_eid).__name__} instead of EID'
+            warnings.warn(warnmsg, TypeWarning)
         self.prev_eid = prev_eid
 
     def get_type_spec(self):
@@ -250,6 +279,10 @@ class BundleAgeBlock(CanonicalBlock):
             calculate it
         """
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
+
+        if not isinstance(bundle_age, int):
+            warnmsg = f'BundleAgeBlock bundle_age is type {type(bundle_age).__name__} instead of int'
+            warnings.warn(warnmsg, TypeWarning)
         self.bundle_age = bundle_age
 
     def get_type_spec(self):
@@ -323,6 +356,10 @@ class HopCountBlock(CanonicalBlock):
         :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to calculate it
         """
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
+
+        if not isinstance(hop_data, HopCountData):
+            warnmsg = f'HopCountBlock hop_data is type {type(hop_data).__name__} instead of HopCountData'
+            warnings.warn(warnmsg, TypeWarning)
         self.hop_data = hop_data
 
     def get_type_spec(self):
@@ -400,6 +437,10 @@ class CustodyTransferBlock(CanonicalBlock):
             calculate it
         """
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
+
+        if not isinstance(cteb_data, CTEBData):
+            warnmsg = f'CustodyTransferBlock cteb_data is type {type(cteb_data).__name__} instead of CTEBData'
+            warnings.warn(warnmsg, TypeWarning)
         self.cteb_data = cteb_data
 
     def get_type_spec(self):
@@ -480,6 +521,10 @@ class CompressedReportingBlock(CanonicalBlock):
             calculate it
         """
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
+
+        if not isinstance(creb_data, CREBData):
+            warnmsg = f'CompressedReportingBlock creb_data is type {type(creb_data).__name__} instead of CREBData'
+            warnings.warn(warnmsg, TypeWarning)
         self.creb_data = creb_data
 
     def get_type_spec(self):
@@ -554,10 +599,14 @@ class PayloadBlock(CanonicalBlock):
             calculate it
         """
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
+
+        if not isinstance(payload, bytes):
+            warnmsg = f'PayloadBlock payload is type {type(payload).__name__} instead of bytes'
+            warnings.warn(warnmsg, TypeWarning)
         self.payload = payload  # payload is NOT doubly cbor encoded
 
         if self.blk_num != 1:
-            warnmsg = f'Payload block number is {self.blk_num} but should be 1'
+            warnmsg = f'PayloadBlock blk_num is {self.blk_num} but should be 1'
             warnings.warn(warnmsg)
 
     def get_type_spec(self):
@@ -574,7 +623,34 @@ class PayloadBlock(CanonicalBlock):
         :return: A CBOR-encoded block
         :rtype: bytearray
         """
-        return super().encode(self.get_type_spec())
+        # The payload is NOT doubly cbor encoded
+        type_spec_data = self.get_type_spec()
+        
+        if self.crc is CRCFlag.CALCULATE and self.crc_type is not None \
+            and self.crc_type >= 1 and self.crc_type <= 2:
+            tmp = \
+                [
+                    self.blk_type,
+                    self.blk_num,
+                    self.control_flags,
+                    self.crc_type,
+                    type_spec_data,
+                ]
+            cfields = [i for i in tmp if i is not None]
+            self.crc = calc_crc(self.crc_type, cfields)
+        
+        tmp = \
+            [
+                    self.blk_type,
+                    self.blk_num,
+                    self.control_flags,
+                    self.crc_type,
+                    type_spec_data,
+                    self.crc,
+            ]
+        cfields = [i for i in tmp if i is not None]
+
+        return cbor2.dumps(cfields, default=default_encoder)
 
     def to_json(self):
         """Encode the Payload block using json.
@@ -582,6 +658,7 @@ class PayloadBlock(CanonicalBlock):
         :return: A json-encoded block
         :rtype: string
         """
+        # The payload is NOT doubly cbor encoded
         type_spec_data = self.get_type_spec()
         
         if self.crc is CRCFlag.CALCULATE and self.crc_type is not None \
@@ -609,41 +686,6 @@ class PayloadBlock(CanonicalBlock):
         cfields = [i for i in tmp if i is not None]
 
         return json.dumps(cfields, default=custom_encoder, indent=4)
-
-        if self.crc is None:
-            return json.dumps(
-                [
-                    self.blk_type,
-                    self.blk_num,
-                    self.control_flags,
-                    self.crc_type,
-                    type_spec_data,
-                ],
-                default=custom_encoder,
-            )
-        elif self.crc == CRCFlag.CALCULATE:
-            self.crc = calc_crc(
-                self.crc_type,
-                [
-                    self.blk_type,
-                    self.blk_num,
-                    self.control_flags,
-                    self.crc_type,
-                    type_spec_data,
-                ],
-            )
-
-        return json.dumps(
-            [
-                self.blk_type,
-                self.blk_num,
-                self.control_flags,
-                self.crc_type,
-                type_spec_data,
-                self.crc,
-            ],
-            default=custom_encoder,
-        )
 
     @classmethod
     def decode(cls, cand_block):
@@ -756,14 +798,49 @@ class PrimaryBlock(Block):
         :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
             calculate it
         """
+        if not isinstance(version, int):
+            warnmsg = f'PrimaryBlock version is type {type(version).__name__} instead of int'
+            warnings.warn(warnmsg, TypeWarning)
         self.version = version
+
+        if not isinstance(control_flags, BundlePCFlags) and not isinstance(control_flags, int):
+            warnmsg = f'PrimaryBlock control_flags is type {type(control_flags).__name__} instead of BundlePCFlags or int'
+            warnings.warn(warnmsg, TypeWarning)
         self.control_flags = control_flags
+
+        if not isinstance(crc_type, CRCType) and not isinstance(crc_type, int):
+            warnmsg = f'PrimaryBlock crc_type is type {type(crc_type).__name__} instead of CRCType or int'
+            warnings.warn(warnmsg, TypeWarning)
         self.crc_type = crc_type
+
+        if not isinstance(dest_eid, EID):
+            warnmsg = f'PrimaryBlock dest_eid is type {type(dest_eid).__name__} instead of EID'
+            warnings.warn(warnmsg, TypeWarning)
         self.dest_eid = dest_eid
+
+        if not isinstance(src_eid, EID):
+            warnmsg = f'PrimaryBlock src_eid is type {type(src_eid).__name__} instead of EID'
+            warnings.warn(warnmsg, TypeWarning)
         self.src_eid = src_eid
+
+        if not isinstance(rpt_eid, EID):
+            warnmsg = f'PrimaryBlock rpt_eid is type {type(rpt_eid).__name__} instead of EID'
+            warnings.warn(warnmsg, TypeWarning)
         self.rpt_eid = rpt_eid
+
+        if not isinstance(creation_timestamp, CreationTimestamp):
+            warnmsg = f'PrimaryBlock creation_timestamp is type {type(creation_timestamp).__name__} instead of CreationTimestamp'
+            warnings.warn(warnmsg, TypeWarning)
         self.creation_timestamp = creation_timestamp
+
+        if not isinstance(lifetime, int):
+            warnmsg = f'PrimaryBlock lifetime is type {type(lifetime).__name__} instead of int'
+            warnings.warn(warnmsg, TypeWarning)
         self.lifetime = lifetime
+        
+        if not isinstance(crc, CRCFlag) and not isinstance(crc, bytes) and crc is not None:
+            warnmsg = f'PrimaryBlock crc is type {type(crc).__name__} instead of CRCFlag, bytes or None'
+            warnings.warn(warnmsg, TypeWarning)
         self.crc = crc
 
     def encode(self):

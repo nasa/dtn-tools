@@ -3,10 +3,13 @@ from enum import IntEnum, IntFlag
 import cbor2
 from crccheck.crc import Crc16IbmSdlc, Crc32Iscsi
 from itertools import zip_longest
+import codecs
 
 import warnings
 
-
+class TypeWarning(Warning):
+    pass
+    
 class AdminRecordType:
     """Administrative Record Types."""
 
@@ -86,7 +89,7 @@ def calc_crc(crc_type, fields):
     """Calculate CRC given crc type and fields.
 
     :param CRCType crc_type: The CRC algorithm to use. Valid values are CRCType.CRC16_X25 and CRCType.CRC32_C
-    :param bytearray fields: The bytearray of bundle fields to calculate the CRC on
+    :param list fields: The list of block fields to calculate the CRC on
     """
     if crc_type == CRCType.CRC16_X25:
         fields.append(b"\x00\x00")
@@ -120,13 +123,16 @@ class EID:
             self.ssp = eid_fields["ssp"]
             if isinstance(self.uri, int) and self.uri == 1 and not isinstance(self.ssp, str):
                 warnmsg = f'DTN EID ssp is {self.ssp} instead of a string'
-                warnings.warn(warnmsg)
+                warnings.warn(warnmsg, TypeWarning)
             if isinstance(self.uri, int) and self.uri == 2 \
-                    and ((not isinstance(self.ssp, list) or len(self.ssp != 2)) \
-                        or not isinstance(self.ssp[0], int) \
-                        or not instance(self.ssp[1], int)):
-                warnmsg = f'IPN EID ssp is {self.ssp} instead of a list of 2 ints'
-                warnings.warn(warnmsg)
+                    and (not isinstance(self.ssp, dict) \
+                        or len(self.ssp) != 2 \
+                        or 'node_num' not in self.ssp \
+                        or 'service_num' not in self.ssp \
+                        or not isinstance(self.ssp['node_num'], int) \
+                        or not isinstance(self.ssp['service_num'], int)):
+                warnmsg = f'IPN EID ssp is {self.ssp} instead of a dict with \'node_num\' and \'service_num\' elements that are ints'
+                warnings.warn(warnmsg, TypeWarning)
                 
     def enc_data(self):
         """Return the data to encode.
@@ -158,7 +164,7 @@ class EID:
         :param list cand_eid: A list of fields representing a candidate EID.
         """
         if isinstance(cand_eid, list) and len(cand_eid) >= 1 \
-                and cand_eid[0] < 1 and cand_eid[0] > 2:
+                and (cand_eid[0] < 1 or cand_eid[0] > 2):
             # Because lookslike() should be called first, we should never get
             # here. If we do it's a programatic error.
             raise ValueError(f'Unsupported EID URI Type {cand_eid[0]}')
@@ -232,8 +238,9 @@ class CreationTimestamp:
         :param list cand_timestamp: A list of fields representing a Creation Timestamp
         """
         if len(cand_timestamp) != 2:
-            warnmsg = "Creation Timestamp should have exactly 2 fields."
-            warnings.warn(warnmsg)
+            # Because lookslike() should be called first, we should never get
+            # here. If we do it's a programatic error.
+            raise ValueError(f'Creation Timestamp has {len(cand_timestamp)} elements but should have 2.')
             
         type_spec_dict = {"time":None, "sequence":None}
         timestamp_d = dict(zip_longest(type_spec_dict, cand_timestamp))
@@ -282,8 +289,9 @@ class HopCountData:
         :param list cand_hopcount_data: A list of fields representing Hop Count Data
         """
         if len(cand_hopcount_data) != 2:
-            warnmsg = "Hop Count Data should have 2 fields."
-            warnings.warn(warnmsg)
+            # Because lookslike() should be called first, we should never get
+            # here. If we do it's a programatic error.
+            raise ValueError(f'Hop Count Data has {len(cand_hopcount_data)} elements but should have 2.')
             
         type_spec_dict = {"hop_limit":None, "hop_count":None}
         hopcount_data = dict(zip_longest(type_spec_dict, cand_hopcount_data))
@@ -340,8 +348,9 @@ class CTEBData:
         :param list cand_hopcount_data: A list of fields representing CTEB Data
         """
         if len(cand_cteb_data) != 3:
-            warnmsg = "CTEB Data should have 3 fields."
-            warnings.warn(warnmsg)
+            # Because lookslike() should be called first, we should never get
+            # here. If we do it's a programatic error.
+            raise ValueError(f'CTEB Data has {len(cand_cteb_data)} elements but should have 3.')
             
         type_spec_dict = {"trans_id":None, "trans_series_id":None, \
             "req_orig_eid":None}
@@ -418,8 +427,9 @@ class CREBData:
         :param list cand_hopcount_data: A list of fields representing CTEB Data
         """
         if len(cand_creb_data) < 1 or len(cand_creb_data) > 5:
-            warnmsg = "CREB Data should have 1 to 5 elements."
-            warnings.warn(warnmsg)
+            # Because lookslike() should be called first, we should never get
+            # here. If we do it's a programatic error.
+            raise ValueError(f'CREB Data has {len(cand_creb_data)} elements but should have 1 to 5.')
             
         type_spec_dict = {"bundle_seq_num":None, "bundle_seq_id":None, \
             "rpt_request_flags":None, "scope_node_id":None, "rpt_eid":None}
@@ -466,4 +476,4 @@ def default_encoder(encoder, value):
     if class_name in class_list:
         encoder.encode(value.enc_data())
     else:
-        raise TypeError
+        raise cbor2.CBOREncodeTypeError(f'cannot serialize type {type(value)}')
