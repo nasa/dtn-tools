@@ -32,11 +32,52 @@ class Bundle:
     }
 
     def __init__(self, pri_block = None, canon_blocks = None):
-        """Initialize the bundle from a primary block and list of extension \
-            blocks.
+        """Initialize the bundle from a primary block and list of extension blocks.
 
         :param PrimaryBlock pri_block: (optional) The primary block of the bundle.
         :param list canon_blocks: (optional) A list of blocks derived from CanonicalBlock
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.blocks import PrevNodeBlock, PayloadBlock, PrimaryBlock
+            from dtngen.bundle import Bundle
+
+            pblock = PrimaryBlock(
+                version=7,
+                control_flags=BundlePCFlags.MUST_NOT_FRAGMENT,
+                crc_type=CRCType.CRC16_X25,
+                dest_eid=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
+                src_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+                rpt_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+                creation_timestamp=CreationTimestamp({"time": 755533838904, "sequence": 0}),
+                lifetime=3600000,
+                crc=b"\\x0b\\x19",
+            )
+            
+            prevnodeblk = PrevNodeBlock(
+                blk_type=BlockType.AUTO,
+                blk_num=2,
+                control_flags=0,
+                crc_type=CRCType.CRC16_X25,
+                prev_eid=EID({"uri": 2, "ssp": {"node_num": 300, "service_num": 2}}),
+                crc=CRCFlag.CALCULATE,
+            )
+
+            payloadblk = PayloadBlock(
+                blk_type=BlockType.AUTO,
+                blk_num=1,
+                control_flags=0,
+                crc_type=CRCType.CRC16_X25,
+                payload=b"\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x0chello world\\n",
+                crc=CRCFlag.CALCULATE,
+            )
+        
+            mybundle = Bundle(
+                pri_block = pblock,
+                canon_blocks = [prevnodeblk, payloadblk]
+            )
         """
         self.pri_block = pri_block
         self.canon_blocks = canon_blocks
@@ -48,6 +89,16 @@ class Bundle:
         :param bytes-like cand_bundle: candidate bundle to attempt parsing
         :return: The parsed bundle object
         :rtype: Bundle
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            from dtngen.bundle import Bundle
+            
+            candidate_bytes = bytes.fromhex("9f8907040182028218c801820282186401820282186401821b000000afe9537a38001a0036ee80420b19860101000150d1bfe62e5da4b519fb68c18b7edb3611420c34ff")
+
+            bundle_from_bytes = Bundle.from_bytes(candidate_bytes)
         """
         try:
             # Attempt to CBOR decode the bundle
@@ -90,6 +141,14 @@ class Bundle:
         :param str fname: The filename to read
         :return: The bundle described within the file
         :rtype: Bundle
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.bundle import Bundle
+            
+            bundle_from_bytes_file = Bundle.from_bytes_file("/path/to/file/bundle.bin")
         """
         with open(fname, "rb") as bytes_file:
             byte_string = bytes_file.read()
@@ -100,6 +159,12 @@ class Bundle:
 
         :return: A CBOR-encoded bundle
         :rtype: bytearray
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            bytesout = mybundle.to_bytes()
         """
         byte_string = self.pri_block.encode() if self.pri_block is not None \
             else b''
@@ -118,6 +183,12 @@ class Bundle:
         """Write a Bundle to a binary file.
 
         :param str fname: The filename to write
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            mybundle.to_bytes_file("/path/to/file/bundle.bin")
         """
         with open(fname, "wb") as bytes_file:
             bytes_file.write(self.to_bytes())
@@ -127,6 +198,12 @@ class Bundle:
 
         :return: A json-encoded bundle
         :rtype: str
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            json_string = mybundle.to_json()
         """
         json_string = "[" + self.pri_block.to_json() \
             if self.pri_block is not None else "["
@@ -149,6 +226,12 @@ class Bundle:
         """Encode the Bundle to a json file.
 
         :param str fname: The filename to write
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            mybundle.to_json_file("/path/to/file/bundle.json")
         """
         with open(fname, "w") as json_file:
             json_file.write(self.to_json())
@@ -160,6 +243,16 @@ class Bundle:
         :param str jsonstr: The json string to decode
         :return: The decoded Bundle described in the json string
         :rtype: Bundle
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.bundle import Bundle
+        
+            jsoncode = \"[json defining a bundle]\"
+            
+            bundle_from_json = Bundle.from_json(jsoncode)
         """
         jsondata = json.loads(jsonstr, object_hook=custom_decoder)
 
@@ -202,6 +295,14 @@ class Bundle:
         :param str fname: The filename to read
         :return: The bundle described within the file
         :rtype: Bundle
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.bundle import Bundle
+        
+            bundle_from_json_file = Bundle.from_json_file("/path/to/file/bundle.json")
         """
         with open(fname, "r") as json_file:
             json_string = json_file.read()
@@ -211,14 +312,54 @@ class Bundle:
     def generate(cls, pri_settings=None, canon_settings=None, num_bundles=1):
         """Generate one or more bundles based on the provided settings.
 
-        :param PrimaryBlockSettings pri_settings: (optional) The settings for \
-            the primary block
-        :param list canon_settings: (optional) List of canonical block \
-            settings instances
-        :param int num_bundles: (optional) Number of bundles to generate - \
-            defaults to 1
+        :param PrimaryBlockSettings pri_settings: (optional) The settings for the primary block
+        :param list canon_settings: (optional) List of canonical block settings instances
+        :param int num_bundles: (optional) Number of bundles to generate - defaults to 1
         :return: list of generated bundles
         :rtype: list
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.blocks import PrimaryBlockSettings, PayloadBlockSettings
+            from dtngen.bundle import Bundle
+
+            # PrimaryBlockSettings is like PrimaryBlock except the
+            # creation_timestamp has generation settings for the time and
+            # sequence instead of explicit values
+            primaryblk_settings = PrimaryBlockSettings(
+                version=7,
+                control_flags=BundlePCFlags.MUST_NOT_FRAGMENT,
+                crc_type=CRCType.CRC16_X25,
+                dest_eid=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
+                src_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+                rpt_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+                creation_timestamp={
+                    "time": {"start": 755533838904, "increment": 256}, 
+                    "sequence": {"start": 0} 
+                },
+                lifetime=3600000,
+                crc=CRCFlag.CALCULATE,
+            )
+            
+            # PayloadBlockSettings is like PayloadBlock except the payload has
+            # the size (in bytes) of random payload to generate instead of a
+            # specific payload
+            payloadblk_settings = PayloadBlockSettings(
+                blk_type=BlockType.AUTO,
+                blk_num=1,
+                control_flags=0,
+                crc_type=CRCType.CRC16_X25,
+                payload={"size": 1024},
+                crc=CRCFlag.CALCULATE,
+            )
+            
+            generated_bundles = Bundle.generate(
+                pri_settings = primaryblk_settings,
+                canon_settings = [payloadblk_settings],
+                num_bundles = 25
+            )
         """
         bundles = []
         for bundle_num in range(num_bundles):

@@ -38,6 +38,7 @@ class BlockType(IntFlag):
         Only BPv7 types are defined and supported.
     """
 
+    AUTO = -1
     BUNDLE_PAYLOAD = 1
     PREVIOUS_NODE = 6
     BUNDLE_AGE = 7
@@ -86,10 +87,21 @@ class CRCFlag(IntEnum):
 
 
 def calc_crc(crc_type, fields):
-    """Calculate CRC given crc type and fields.
+    """Calculate CRC given crc type and fields. The fields will be cbor encoded.
 
     :param CRCType crc_type: The CRC algorithm to use. Valid values are CRCType.CRC16_X25 and CRCType.CRC32_C
     :param list fields: The list of block fields to calculate the CRC on
+
+    :return: CRC as a byte string
+    :rtype: bytes
+
+    *Usage:*
+
+    .. code-block:: python
+    
+        from dtngen.types import CRCType, calc_crc
+        
+        crc = calc_crc(crc_type = CRCType.CRC16_X25, fields = [1, 2, b'\\x03\\x04'])
     """
     if crc_type == CRCType.CRC16_X25:
         fields.append(b"\x00\x00")
@@ -110,6 +122,32 @@ class EID:
         """Initialize the EID.
 
         :param dict eid_fields: EID fields
+
+        *Usage:*
+
+        URI type 1 (dtn URI scheme):
+        
+        .. code-block:: python
+        
+            from dtngen.types import EID
+            
+            myeid = EID(
+                {
+                    uri: 1,
+                    ssp: "dtn:none"
+                }
+            )
+
+        URI type 2 (ipn URI scheme):
+        
+        .. code-block:: python
+        
+            myeid = EID(
+                {
+                    uri: 2,
+                    ssp: {"node_num": 200, "service_num": 1}
+                }
+            )
         """
         self.uri = None
         self.ssp = None
@@ -139,6 +177,12 @@ class EID:
 
         :return: list of data to encode
         :rtype: list
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            data = myeid.enc_data()
         """
         if (not isinstance(self.uri, int)) or self.uri <= 1 or self.uri > 2:
             # If it is DTN type or is an invalid type, pass through the data
@@ -162,6 +206,17 @@ class EID:
         """Attempt to parse an EID.
 
         :param list cand_eid: A list of fields representing a candidate EID.
+        :return: The decoded EID
+        :rtype: EID
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.types import EID
+            
+            eid_elements = [2, [200, 1]]
+            myeid = EID.decode(eid_elements)
         """
         if isinstance(cand_eid, list) and len(cand_eid) >= 1 \
                 and (cand_eid[0] < 1 or cand_eid[0] > 2):
@@ -192,6 +247,17 @@ class EID:
         """Check if candidate EID looks like an EID.
 
         :param list cand_eid: A list of fields representing a candidate EID.
+        :return: True if the fields look like an EID, otherwise False
+        :rtype: bool
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.types import EID
+        
+            if EID.lookslike(list_of_candidate_fields):
+                print ("It looks like an EID")
         """
         if isinstance(cand_eid, list) and len(cand_eid) == 2 \
                 and isinstance(cand_eid[0], int):
@@ -213,6 +279,14 @@ class CreationTimestamp:
         """Initialize the Creation Timestamp.
 
         :param dict timestamp_fields: Timestamp Fields
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.types import CreationTimestamp
+            
+            mytimestamp = CreationTimestamp({"time": 755533838904, "sequence": 0})
         """
         self.time = None
         self.sequence = None
@@ -227,6 +301,12 @@ class CreationTimestamp:
 
         :return: list of data to encode
         :rtype: list
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            data = mytimestamp.enc_data()
         """
         data = [self.time, self.sequence]
         return [i for i in data if i is not None]
@@ -236,6 +316,18 @@ class CreationTimestamp:
         """Attempt to parse a Creation Timestamp.
 
         :param list cand_timestamp: A list of fields representing a Creation Timestamp
+        :return: The decoded creation timestamp
+        :rtype: CreationTimestamp
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.types import CreationTimestamp
+            
+            
+            cts_elements = [755533838904, 0]
+            mytimestamp = CreationTimestamp.decode(cts_elements)
         """
         if len(cand_timestamp) != 2:
             # Because lookslike() should be called first, we should never get
@@ -252,6 +344,17 @@ class CreationTimestamp:
         """Check if candidate creation timestamp looks like an creation timestamp.
 
         :param list cand_eid: A list of fields representing a candidate creation timestamp.
+        :return: True if the fields look like a CreationTimestamp, otherwise False
+        :rtype: bool
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.types import CreationTimestamp
+        
+            if CreationTimestamp.lookslike(list_of_candidate_fields):
+                print ("It looks like a CreationTimestamp")
         """
         return isinstance(cand_eid, list) and len(cand_eid) == 2 \
             and isinstance(cand_eid[0], int) and isinstance(cand_eid[1], int)
@@ -264,6 +367,14 @@ class HopCountData:
         """Initialize the Hop Count Data.
 
         :param dict hopcount_fields: Hop Count Fields
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.types import HopCountData
+            
+            myhopdata = HopCountData({"hop_limit": 15, "hop_count": 3})
         """
         self.hop_limit = None
         self.hop_count = None
@@ -278,6 +389,12 @@ class HopCountData:
 
         :return: list of data to encode
         :rtype: list
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            data = myhopdata.enc_data()
         """
         data = [self.hop_limit, self.hop_count]
         return [i for i in data if i is not None]
@@ -287,6 +404,17 @@ class HopCountData:
         """Attempt to parse Hop Count data.
 
         :param list cand_hopcount_data: A list of fields representing Hop Count Data
+        :return: The decoded hop count data
+        :rtype: HopCountData
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.types import HopCountData
+            
+            hc_elements = [15, 3]
+            myhopdata = HopCountData.decode(hc_elements)
         """
         if len(cand_hopcount_data) != 2:
             # Because lookslike() should be called first, we should never get
@@ -303,6 +431,17 @@ class HopCountData:
         """Check if candidate hop count data looks like Hop Count data.
 
         :param list cand_eid: A list of fields representing candidate hop count data.
+        :return: True if the fields look like HopCountData, otherwise False
+        :rtype: bool
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.types import HopCountData
+        
+            if HopCountData.lookslike(list_of_candidate_fields):
+                print ("It looks like HopCountData")
         """
         if not isinstance(cand_hopcount_data, list):
             return False
@@ -320,6 +459,19 @@ class CTEBData:
         """Initialize the CTEB Data.
 
         :param dict cteb_fields: CTEB Data Fields
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.types import CTEBData, EID
+            
+            myctebdata = CTEBData(
+                {
+                    "trans_id": 10,
+                    "trans_series_id": 2,
+                    "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}})
+                )
         """
         self.trans_id = None
         self.trans_series_id = None
@@ -337,6 +489,12 @@ class CTEBData:
 
         :return: list of data to encode
         :rtype: list
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            data = myctebdata.enc_data()
         """
         data = [self.trans_id, self.trans_series_id, self.req_orig_eid]
         return [i for i in data if i is not None]
@@ -345,7 +503,18 @@ class CTEBData:
     def decode(cls, cand_cteb_data):
         """Attempt to parse CTEB data.
 
-        :param list cand_hopcount_data: A list of fields representing CTEB Data
+        :param list cand_cteb_data: A list of fields representing CTEB Data
+        :return: The decoded CTEB data
+        :rtype: CTEBData
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.types import CTEBData
+            
+            ctebd_elements = [10, 2, [2, [303, 1]]]
+            myctebdata = CTEBData.decode(ctebd_elements)
         """
         if len(cand_cteb_data) != 3:
             # Because lookslike() should be called first, we should never get
@@ -365,7 +534,18 @@ class CTEBData:
     def lookslike(cls, cand_cteb_data):
         """Check if candidate hop count data looks like Hop Count data.
 
-        :param list cand_eid: A list of fields representing candidate hop count data.
+        :param list cand_eid: A list of fields representing candidate CTEB data.
+        :return: True if the fields look like CTEBData, otherwise False
+        :rtype: bool
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.types import CTEBData
+        
+            if CTEBData.lookslike(list_of_candidate_fields):
+                print ("It looks like CTEBData")
         """
         if not isinstance(cand_cteb_data, list):
             return False
@@ -384,6 +564,39 @@ class CREBData:
         """Initialize the CREB Data.
 
         :param dict creb_fields: CREB Data Fields
+
+        *Usage:*
+        
+        CREBData contains 1 to 5 elements. In a valid case, if an element is provided, all prior elements must also be provided.
+        
+        All elements provided:
+
+        .. code-block:: python
+        
+            from dtngen.types import CTEBData, EID
+            
+            myrtebdata = CREBData
+            (
+                {
+                    "bundle_seq_num": 1,
+                    "bundle_seq_id": 4,
+                    "rpt_request_flags": 0,
+                    "scope_node_id": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
+                    "rpt_eid": EID({"uri": 2, "ssp": {"node_num": 305, "service_num": 2}})
+                }
+            )
+        
+        Only the first two elements provided:
+
+        .. code-block:: python
+        
+            myrtebdata = CREBData
+            (
+                {
+                    "bundle_seq_num": 2,
+                    "bundle_seq_id": 6
+                }
+            )
         """
         self.bundle_seq_num = None
         self.bundle_seq_id = None
@@ -414,6 +627,12 @@ class CREBData:
 
         :return: list of data to encode
         :rtype: list
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            data = mycrebdata.enc_data()
         """
         data = [self.bundle_seq_num, self.bundle_seq_id, \
             self.rpt_request_flags, self.scope_node_id, self.rpt_eid]
@@ -425,6 +644,17 @@ class CREBData:
         """Attempt to parse CTEB data.
 
         :param list cand_hopcount_data: A list of fields representing CTEB Data
+        :return: The decoded CREB data
+        :rtype: CREBData
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.types import CREBData
+            
+            crebd_elements = [1, 4, 0, [2, [303, 1]], [2, [305, 2]]]
+            mycrebdata = CREBData.decode(crebd_elements)
         """
         if len(cand_creb_data) < 1 or len(cand_creb_data) > 5:
             # Because lookslike() should be called first, we should never get
@@ -446,7 +676,18 @@ class CREBData:
     def lookslike(cls, cand_creb_data):
         """Check if candidate hop count data looks like Hop Count data.
 
-        :param list cand_creb_data: A list of fields representing candidate hop count data.
+        :param list cand_creb_data: A list of fields representing candidate CREB data.
+        :return: True if the fields look like CREBData, otherwise False
+        :rtype: bool
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.types import CREBData
+        
+            if CREBData.lookslike(list_of_candidate_fields):
+                print ("It looks like CREBData")
         """
         if not isinstance(cand_creb_data, list):
             return False
@@ -468,7 +709,8 @@ class CREBData:
 
 
 def default_encoder(encoder, value):
-    """cbor2 custom field encoder."""
+    """cbor2 custom field encoder. Encodes a value of one of the defined dtngen.types data types as cbor
+    """
     class_list = \
         ['EID', 'CreationTimestamp', 'HopCountData', 'CTEBData', 'CREBData']
     class_name = type(value).__name__

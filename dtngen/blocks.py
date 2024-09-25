@@ -19,8 +19,7 @@ class Block(ABC):
     def decode(cls, cand_block):
         """Attempt to decode the block.
 
-        :param list cand_block: A list of objects to be interpreted as a \
-            block.
+        :param list cand_block: A list of objects to be interpreted as a block.
         """
         # I initially tried @abstractmethod, but Python doesn't seem to enforce abstract
         # class methods until an object is instantiated. We have to throw this exception to guarantee all
@@ -36,13 +35,16 @@ class CanonicalBlock(Block):
     def __init__(self, blk_type=None, blk_num=None, control_flags=None, crc_type=None, crc=None):
         """Initialize the extension block with the requested fields.
 
-        :param BlockType blk_type: (optional) the type of Canonical block
+        :param BlockType blk_type: (optional) the type of Canonical block. Can be a specific BlockType or BlockType.AUTO to set to the matching BlockType.
         :param int blk_num: (optional) block number
-        :param BlockPCFlags control_flags: (optional) block processing control \
-            flags
+        :param BlockPCFlags control_flags: (optional) block processing control flags
         :param CRCType crc_type: (optional) CRC type
-        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
-            calculate it
+        :param bytes crc: (optional) crc value or CRCFlag.CALCULATE to calculate it
+
+        .. important::
+        
+            CanonicalBlocks should not normally be created by the user, instead
+            the sub-classes should be created.
         """
         cclass_name = self.__class__.__name__
         
@@ -77,8 +79,12 @@ class CanonicalBlock(Block):
     def decode_common(cls, cand_block):
         """Decode the fields common to all canonical blocks.
 
-        :param list cand_block: A list representing the candidate Canonical \
-            Block
+        :param list cand_block: A list representing the candidate Canonical Block
+
+        .. important::
+        
+            CanonicalBlock methods should not normally be called by the user,
+            instead the sub-class methods should be called.
         """
         if not isinstance(cand_block, list):
             raise ValueError("Candidate Canonical Block is not a list")
@@ -109,6 +115,11 @@ class CanonicalBlock(Block):
 
         :return: A CBOR-encoded block
         :rtype: bytearray
+
+        .. important::
+        
+            CanonicalBlock methods should not normally be called by the user,
+            instead the sub-class methods should be called.
         """
         if type_spec_data is not None:
             if not isinstance(type_spec_data, bytes):
@@ -147,6 +158,11 @@ class CanonicalBlock(Block):
 
         :return: A json-encoded block
         :rtype: string
+
+        .. important::
+        
+            CanonicalBlock methods should not normally be called by the user,
+            instead the sub-class methods should be called.
         """
         enc_type_spec_data = type_spec_data
         if type_spec_data is not None:
@@ -186,18 +202,33 @@ class PrevNodeBlock(CanonicalBlock):
 
     def __init__(self, blk_type=None, blk_num=None, control_flags=None, crc_type=None, prev_eid=None, \
         crc=None):
-        """Initialze the previous node block with the requested fields.
+        """Initialize the previous node block with the requested fields.
 
-        :param BlockType blk_type: (optional) the type of Canonical block
+        :param BlockType blk_type: (optional) the type of Canonical block. Can be a specific BlockType or BlockType.AUTO to set to the matching BlockType.
         :param int blk_num: (optional) block number
-        :param BlockPCFlags control_flags: (optional) block processing control \
-            flags
+        :param BlockPCFlags control_flags: (optional) block processing control flags
         :param CRCType crc_type: (optional) CRC type
-        :param EID prev_eid: (optional) node that forwarded this bundle to the \
-            local node
-        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
-            calculate it
+        :param EID prev_eid: (optional) node that forwarded this bundle to the local node
+        :param bytes crc: (optional) crc value or CRCFlag.CALCULATE to calculate it
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.blocks import PrevNodeBlock
+            from dtngen.types import BlockType, BlockPCFlags, CRCType, CRCFlag, EID
+            
+            prevnodeblk = PrevNodeBlock(
+                BlockType = BlockType.AUTO,
+                blk_num = 2,
+                control_flags = BlockPCFlags.FRAG_REPLICATE | BlockPCFlags.DEL_UNPROC,
+                CRCType = CRCType.CRC16_X25,
+                prev_eid = EID({"uri": 2, "ssp": {"node_num": 300, "service_num": 2}}),
+                crc = CRCFlag.CALCULATE
+            )
         """
+        if blk_type == BlockType.AUTO:
+            blk_type = BlockType.PREVIOUS_NODE
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
 
         if not isinstance(prev_eid, EID):
@@ -210,6 +241,12 @@ class PrevNodeBlock(CanonicalBlock):
 
         :return: Type-specific value
         :rtype: EID
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            ts_data = prev_node_block.get_type_spec()
         """        
         return self.prev_eid
 
@@ -218,6 +255,12 @@ class PrevNodeBlock(CanonicalBlock):
 
         :return: A CBOR-encoded block
         :rtype: bytearray
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            cbor_encoded_pnb = prev_node_block.encode()
         """            
         return super().encode(self.get_type_spec())
         
@@ -226,6 +269,12 @@ class PrevNodeBlock(CanonicalBlock):
 
         :return: A json-encoded block
         :rtype: string
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            pnb_json = prev_node_block.to_json()
         """
         return super().to_json(self.get_type_spec())
         
@@ -233,11 +282,21 @@ class PrevNodeBlock(CanonicalBlock):
     def decode(cls, cand_block):
         """Attempt to decode the candidate block as a BPv7 Previouse Node Block.
 
-        :params list cand_block: A list of objects to be interpreted as a \
-            Previous Node Block.
+        :params list cand_block: A list of objects to be interpreted as a Previous Node Block.
             
         :return: A Previous Node Block
         :rtype: PrevNodeBlock
+
+        *Usage:*
+        
+        The type-specific data (5th element) is doubly cbor encoded. It is passed into this method as a byte string containing cbor encoded data.
+
+        .. code-block:: python
+        
+            from dtngen.blocks import PrevNodeBlock
+            
+            pnblock_elements = [6, 2, 1, 1, b'\\x82\\x02\\x82\\x19\\x01\\x2c\\x02', b'\\x25\\xd4']
+            pnblock = PrevNodeBlock.decode(pnblock_elements)
         """
         canon_fields = CanonicalBlock.decode_common(cand_block)
         
@@ -265,19 +324,35 @@ class BundleAgeBlock(CanonicalBlock):
     def __init__(
         self, blk_type=None, blk_num=None, control_flags=None, crc_type=None, bundle_age=None, crc=None
     ):
-        """Initialze the bundle age block with the requested fields.
+        """Initialize the bundle age block with the requested fields.
 
-        :param BlockType blk_type: (optional) the type of Canonical block
+        :param BlockType blk_type: (optional) the type of Canonical block. Can be a specific BlockType or BlockType.AUTO to set to the matching BlockType.
         :param int blk_num: (optional) block number
-        :param BlockPCFlags control_flags: (optional) block processing control \
-            flags
+        :param BlockPCFlags control_flags: (optional) block processing control flags
         :param CRCType crc_type: (optional) CRC type
         :param int bundle_age: (optional) number of milliseconds elapsed \
-            between time bundle was created and time it was most recently \
-            forwarded
-        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
-            calculate it
+between time bundle was created and time it was most recently forwarded
+        :param bytes crc: (optional) crc value or CRCFlag.CALCULATE to \
+calculate it
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.blocks import BundleAgeBlock
+            from dtngen.types import BlockType, BlockPCFlags, CRCType, CRCFlag
+            
+            bundle_age_block = BundleAgeBlock(
+                blk_type=BlockType.AUTO,
+                blk_num=2,
+                control_flags=BlockPCFlags.FRAG_REPLICATE | BlockPCFlags.DEL_UNPROC,
+                crc_type=CRCType.CRC16_X25,
+                bundle_age=108000,
+                crc=CRCFlag.CALCULATE,
+            )
         """
+        if blk_type == BlockType.AUTO:
+            blk_type = BlockType.BUNDLE_AGE
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
 
         if not isinstance(bundle_age, int):
@@ -290,6 +365,12 @@ class BundleAgeBlock(CanonicalBlock):
 
         :return: Type-specific value
         :rtype: unsigned int
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            ts_data = bundle_age_block.get_type_spec()
         """        
         return self.bundle_age
 
@@ -298,6 +379,12 @@ class BundleAgeBlock(CanonicalBlock):
 
         :return: A CBOR-encoded block
         :rtype: bytearray
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            cbor_encoded_bab = bundle_age_block.encode()
         """
         return super().encode(self.get_type_spec())
         
@@ -306,6 +393,12 @@ class BundleAgeBlock(CanonicalBlock):
 
         :return: A json-encoded block
         :rtype: string
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            bab_json = bundle_age_block.to_json()
         """
         return super().to_json(self.get_type_spec())
 
@@ -313,11 +406,21 @@ class BundleAgeBlock(CanonicalBlock):
     def decode(cls, cand_block):
         """Attempt to decode the candidate block as a BPv7 Bundle Age Block.
 
-        :params list cand_block: A list of objects to be interpreted as a \
-            Bundle Age Block.
+        :params list cand_block: A list of objects to be interpreted as a Bundle Age Block.
             
         :return: A Bundle Age Block
         :rtype: BundleAgeBlock
+
+        *Usage:*
+        
+        The type-specific data (5th element) is doubly cbor encoded. It is passed into this method as a byte string containing cbor encoded data.
+
+        .. code-block:: python
+        
+            from dtngen.blocks import BundleAgeBlock
+            
+            bablock_elements = [7, 2, 5, 1, b'\\x1a\\x00\\x01\\xa5\\xe0', b'\\x3a\\xed']
+            pnblock = BundleAgeBlock.decode(bablock_elements)
         """
         canon_fields = CanonicalBlock.decode_common(cand_block)
 
@@ -346,15 +449,33 @@ class HopCountBlock(CanonicalBlock):
     ):
         """Initialize the hop count block with the requested fields.
 
-        :param BlockType blk_type: (optional) the type of Canonical block
+        :param BlockType blk_type: (optional) the type of Canonical block. Can be a specific BlockType or BlockType.AUTO to set to the matching BlockType.
         :param int blk_num: (optional) block number
         :param BlockPCFlags (optional) control_flags: block processing control flags
         :param CRCType crc_type: (optional) CRC type
         :param HopCountData hop_data: (optional) hop_limit after which it \
-            should be deleted and hop_count number of times bundle was forward \
-            from one node to another
-        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to calculate it
+should be deleted and hop_count number of times bundle was forward from one \
+node to another
+        :param bytes crc: (optional) crc value or CRCFlag.CALCULATE to calculate it
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.blocks import HopCountBlock
+            from dtngen.types import BlockType, BlockPCFlags, CRCType, CRCFlag, HopCountData
+            
+            hop_count_block = HopCountBlock(
+                blk_type=BlockType.AUTO,
+                blk_num=3,
+                control_flags=BlockPCFlags.FRAG_REPLICATE,
+                crc_type=CRCType.CRC16_X25,
+                hop_data=HopCountData({"hop_limit": 15, "hop_count": 3}),
+                crc=CRCFlag.CALCULATE,
+            )
         """
+        if blk_type == BlockType.AUTO:
+            blk_type = BlockType.HOP_COUNT
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
 
         if not isinstance(hop_data, HopCountData):
@@ -367,6 +488,12 @@ class HopCountBlock(CanonicalBlock):
 
         :return: Type-specific values
         :rtype: list
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            ts_data = hop_count_block.get_type_spec()
         """
         return self.hop_data
 
@@ -375,6 +502,12 @@ class HopCountBlock(CanonicalBlock):
 
         :return: A CBOR-encoded block
         :rtype: bytearray
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            cbor_encoded_hcb = hop_count_block.encode()
         """
         return super().encode(self.get_type_spec())
         
@@ -383,6 +516,12 @@ class HopCountBlock(CanonicalBlock):
 
         :return: A json-encoded block
         :rtype: string
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            hcb_json = hop_count_block.to_json()
         """
         return super().to_json(self.get_type_spec())
 
@@ -390,11 +529,21 @@ class HopCountBlock(CanonicalBlock):
     def decode(cls, cand_block):
         """Attempt to decode the candidate block as a BPv7 Hop Count Block.
 
-        :params list cand_block: A list of objects to be interpreted as a Hop \
-            Count Block.
+        :params list cand_block: A list of objects to be interpreted as a Hop Count Block.
             
         :return: A Hop Count Block
         :rtype: HopCountBlock
+
+        *Usage:*
+        
+        The type-specific data (5th element) is doubly cbor encoded. It is passed into this method as a byte string containing cbor encoded data.
+
+        .. code-block:: python
+        
+            from dtngen.blocks import HopCountBlock
+            
+            hcblock_elements = [10, 3, 1, 1, b'\\x82\\x0f\\x03', b'\\xf8\\x13']
+            hcblock = HopCountBlock.decode(hcblock_elements)
         """
         canon_fields = CanonicalBlock.decode_common(cand_block)
 
@@ -422,20 +571,39 @@ class CustodyTransferBlock(CanonicalBlock):
         self, blk_type=None, blk_num=None, control_flags=None, crc_type=None, \
             cteb_data=None, crc=None
     ):
-        """Initialize the custody transfer extension block with the requested \
-            fields.
+        """Initialize the custody transfer extension block with the requested fields.
 
-        :param BlockType blk_type: (optional) the type of Canonical block
+        :param BlockType blk_type: (optional) the type of Canonical block. Can be a specific BlockType or BlockType.AUTO to set to the matching BlockType.
         :param int blk_num: (optional) block number
-        :param BlockPCFlags (optional) control_flags: block processing control \
-            flags
+        :param BlockPCFlags (optional) control_flags: block processing control flags
         :param CRCType crc_type: (optional) CRC type
         :param CTEBData cteb_data: (optional) trans_id identifier for the \
-            custody signal, trans_series_id intentifier for a transmission \
-            series reg_orig_eid EID of the originator of the custody request
-        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
-            calculate it
+custody signal, trans_series_id intentifier for a transmission series \
+reg_orig_eid EID of the originator of the custody request
+        :param bytes crc: (optional) crc value or CRCFlag.CALCULATE to calculate it
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.blocks import CustodyTransferBlock
+            from dtngen.types import BlockType, BlockPCFlags, CRCType, CRCFlag, CTEBData
+            
+            cte_block = CustodyTransferBlock(
+                blk_type=BlockType.AUTO,
+                blk_num=4,
+                control_flags=BlockPCFlags.REP_UNPROC,
+                crc_type=CRCType.CRC16_X25,
+                cteb_data=CTEBData(
+                    {"trans_id": 10,
+                    "trans_series_id": 2,
+                    "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}})}
+                ),
+                crc=CRCFlag.CALCULATE,
+            )
         """
+        if blk_type == BlockType.AUTO:
+            blk_type = BlockType.CUST_TRANS_EXT
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
 
         if not isinstance(cteb_data, CTEBData):
@@ -448,6 +616,12 @@ class CustodyTransferBlock(CanonicalBlock):
 
         :return: Type-specific values
         :rtype: list
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            ts_data = custody_transfer_block.get_type_spec()
         """        
         return self.cteb_data
 
@@ -456,6 +630,12 @@ class CustodyTransferBlock(CanonicalBlock):
 
         :return: A CBOR-encoded block
         :rtype: bytearray
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            cbor_encoded_ctb = custody_transfer_block.encode()
         """
         return super().encode(self.get_type_spec())
         
@@ -464,19 +644,34 @@ class CustodyTransferBlock(CanonicalBlock):
 
         :return: A json-encoded block
         :rtype: string
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            ctb_json = custody_transfer_block.to_json()
         """
         return super().to_json(self.get_type_spec())
 
     @classmethod
     def decode(cls, cand_block):
-        """Attempt to decode the candidate block as a BPv7 Custody Transfer \
-            Extension Block.
+        """Attempt to decode the candidate block as a BPv7 Custody Transfer Extension Block.
 
-        :params list cand_block: A list of objects to be interpreted as a \
-            Custody Transfer Extension Block.
+        :params list cand_block: A list of objects to be interpreted as a Custody Transfer Extension Block.
             
         :return: A Custody Transfer Extension Block
         :rtype: CustodyTransferBlock
+
+        *Usage:*
+        
+        The type-specific data (5th element) is doubly cbor encoded. It is passed into this method as a byte string containing cbor encoded data.
+
+        .. code-block:: python
+        
+            from dtngen.blocks import CustodyTransferBlock
+            
+            ctblock_elements = [15, 4, 2, 1, b'\\x83\\x0a\\x02\\x82\\x02\\x82\\x19\\x01\\x2f\\x01', b'\\x25\\xc7']
+            ctblock = CustodyTransferBlock.decode(ctblock_elements)
         """
         canon_fields = CanonicalBlock.decode_common(cand_block)
 
@@ -505,21 +700,43 @@ class CompressedReportingBlock(CanonicalBlock):
         self, blk_type=None, blk_num=None, control_flags=None, crc_type=None, \
             creb_data=None, crc=None
     ):
-        """Initialize the compressed reporting extension block with the \
-            requested fields. For the block-type-specific fields, if one is \
-            provided, all prior ones must also be provided. For example, if \
-            rpt_request_flags is provided, then both bundle_seq_id and \
-            bundle_seq_num must be provided as well.
+        """Initialize the compressed reporting extension block with the requested fields.
+        
+        For the block-type-specific fields, if one is provided, all prior ones
+        must also be provided. For example, if rpt_request_flags is provided,
+        then both bundle_seq_id and bundle_seq_num must be provided as well.
 
-        :param BlockType blk_type: (optional) the type of Canonical block
+        :param BlockType blk_type: (optional) the type of Canonical block. Can be a specific BlockType or BlockType.AUTO to set to the matching BlockType.
         :param int blk_num: (optional) block number
-        :param BlockPCFlags control_flags: (optional) block processing control \
-            flags
+        :param BlockPCFlags control_flags: (optional) block processing control flags
         :param CRCType crc_type: (optional) CRC type
         :param CREBData creb_data: (optional) The CREB type-specific data
-        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
-            calculate it
+        :param bytes crc: (optional) crc value or CRCFlag.CALCULATE to calculate it
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.blocks import CompressedReportingBlock
+            from dtngen.types import BlockType, BlockPCFlags, CRCType, CRCFlag, CREBData, EID
+            
+            cre_block = CompressedReportingBlock(
+                blk_type=BlockType.AUTO,
+                blk_num=5,
+                control_flags=0,
+                crc_type=CRCType.CRC16_X25,
+                creb_data=CREBData(
+                    {"bundle_seq_num": 1,
+                    "bundle_seq_id": 4,
+                    "rpt_request_flags": 0,
+                    "scope_node_id": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
+                    "rpt_eid": EID({"uri": 2, "ssp": {"node_num": 305, "service_num": 2}})}
+                ),
+                crc=CRCFlag.CALCULATE,
+            )
         """
+        if blk_type == BlockType.AUTO:
+            blk_type = BlockType.COMP_RPT_EXT
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
 
         if not isinstance(creb_data, CREBData):
@@ -532,6 +749,12 @@ class CompressedReportingBlock(CanonicalBlock):
 
         :return: Type-specific values
         :rtype: list
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            ts_data = compressed_reporting_block.get_type_spec()
         """
         return self.creb_data
         
@@ -540,6 +763,12 @@ class CompressedReportingBlock(CanonicalBlock):
 
         :return: A CBOR-encoded block
         :rtype: bytearray
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            cbor_encoded_crb = compressed_reporting_block.encode()
         """
         return super().encode(self.get_type_spec())
         
@@ -548,19 +777,34 @@ class CompressedReportingBlock(CanonicalBlock):
 
         :return: A json-encoded block
         :rtype: string
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            cbor_encoded_crb = compressed_reporting_block.to_json()
         """
         return super().to_json(self.get_type_spec())
 
     @classmethod
     def decode(cls, cand_block):
-        """Attempt to decode the candidate block as a BPv7 Compressed \
-            Reporting Extension Block.
+        """Attempt to decode the candidate block as a BPv7 Compressed Reporting Extension Block.
 
-        :params list cand_block: A list of objects to be interpreted as a \
-            Compressed Reporting Extension Block.
+        :params list cand_block: A list of objects to be interpreted as a Compressed Reporting Extension Block.
             
         :return: A Compressed Reporting Extension Block
         :rtype: CompressedReportingBlock
+
+        *Usage:*
+        
+        The type-specific data (5th element) is doubly cbor encoded. It is passed into this method as a byte string containing cbor encoded data.
+
+        .. code-block:: python
+        
+            from dtngen.blocks import CompressedReportingBlock
+            
+            crblock_elements = [16, 5, 0, 1, b'\\x85\\x01\\x04\\x00\\x82\\x02\\x82\\x19\\x01\\x2f\\x01\\x82\\x02\\x82\\x19\\x01\\x31\\x02', b'\\x66\\xce']
+            ctblock = CompressedReportingBlock.decode(crblock_elements)
         """
         canon_fields = CanonicalBlock.decode_common(cand_block)
 
@@ -587,17 +831,33 @@ class PayloadBlock(CanonicalBlock):
 
     def __init__(self, blk_type=None, blk_num=None, control_flags=None, crc_type=None, payload=None, \
         crc=None):
-        """Initialze the payload block with the requested fields.
+        """Initialize the payload block with the requested fields.
 
-        :param BlockType blk_type: (optional) the type of Canonical block
+        :param BlockType blk_type: (optional) the type of Canonical block. Can be a specific BlockType or BlockType.AUTO to set to the matching BlockType.
         :param int blk_num: (optional) block number
-        :param BlockPCFlags control_flags: (optional) block processing control \
-            flags
+        :param BlockPCFlags control_flags: (optional) block processing control flags
         :param CRCType crc_type: (optional) CRC type
         :param bytes payload: (optional) the bundle payload
-        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
-            calculate it
+        :param bytes crc: (optional) crc value or CRCFlag.CALCULATE to calculate it
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.blocks import PayloadBlock
+            from dtngen.types import BlockType, BlockPCFlags, CRCType, CRCFlag
+            
+            payload_block = PayloadBlock(
+                blk_type=BlockType.AUTO,
+                blk_num=1,
+                control_flags=0,
+                crc_type=CRCType.CRC16_X25,
+                payload=b'\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x0chello world\\n',
+                crc=CRCFlag.CALCULATE,
+            )
         """
+        if blk_type == BlockType.AUTO:
+            blk_type = BlockType.BUNDLE_PAYLOAD
         super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
 
         if not isinstance(payload, bytes):
@@ -614,6 +874,12 @@ class PayloadBlock(CanonicalBlock):
 
         :return: Payload
         :rtype: CBOR bytestring
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            ts_data = payload_block.get_type_spec()
         """                    
         return self.payload
 
@@ -622,6 +888,12 @@ class PayloadBlock(CanonicalBlock):
 
         :return: A CBOR-encoded block
         :rtype: bytearray
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            cbor_encoded_pb = payload_block.encode()
         """
         # The payload is NOT doubly cbor encoded
         type_spec_data = self.get_type_spec()
@@ -657,6 +929,12 @@ class PayloadBlock(CanonicalBlock):
 
         :return: A json-encoded block
         :rtype: string
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            pb_json = payload_block.to_json()
         """
         # The payload is NOT doubly cbor encoded
         type_spec_data = self.get_type_spec()
@@ -696,6 +974,17 @@ class PayloadBlock(CanonicalBlock):
             
         :return: A Payload Block
         :rtype: PayloadBlock
+
+        *Usage:*
+        
+        Unlike other canonical blocks, the type-specific data (5th element) of the PayloadBlock is NOT doubly cbor encoded. The byte string is the payload.
+
+        .. code-block:: python
+        
+            from dtngen.blocks import PayloadBlock
+            
+            pblock_elements = [1, 1, 0, 1, b'\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x0chello world\\n', b'\\x7a\\x2f']
+            ctblock = PayloadBlock.decode(pblock_elements)
         """
         canon_fields = CanonicalBlock.decode_common(cand_block)
         
@@ -714,17 +1003,32 @@ class PayloadBlockSettings:
 
     def __init__(self, blk_type=None, blk_num=None, control_flags=None, 
         crc_type=None, payload=None, crc=None):
-        """Initialze the payload block with the requested fields.
+        """Initialize the payload block with the requested fields.
 
-        :param BlockType blk_type: (optional) the type of Canonical block
+        :param BlockType blk_type: (optional) the type of Canonical block. Can be a specific BlockType or BlockType.AUTO to set to the matching BlockType.
         :param int blk_num: (optional) block number
-        :param BlockPCFlags control_flags: (optional) block processing control \
-            flags
+        :param BlockPCFlags control_flags: (optional) block processing control flags
         :param CRCType crc_type: (optional) CRC type
-        :param dict payload: (optional) {"size": <payload size>} "size" key \
-            with payload size in bytes to generate
-        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
-            calculate it
+        :param dict payload: (optional) {"size": <payload size>} "size" key with payload size in bytes to generate
+        :param bytes crc: (optional) crc value or CRCFlag.CALCULATE to calculate it
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            from dtngen.blocks import PayloadBlockSettings
+
+            # PayloadBlockSettings is like PayloadBlock except the payload has
+            # the size (in bytes) of random payload to generate instead of a
+            # specific payload
+            payloadblk_settings = PayloadBlockSettings(
+                blk_type=BlockType.AUTO,
+                blk_num=1,
+                control_flags=0,
+                crc_type=CRCType.CRC16_X25,
+                payload={"size": 1024},
+                crc=CRCFlag.CALCULATE,
+            )
         """
         self.blk_type = blk_type
         self.blk_num = blk_num
@@ -745,14 +1049,18 @@ larger than the MAX_PAYLOAD_SIZE of {PayloadBlockSettings.MAX_PAYLOAD_SIZE}'
 contain \"size\" key with int value")
 
     def generate(self, bundle_num):
-        """Generate a payload block with the settings in this \
-            PayloadBundleSettings. bundle_num is ignored.
+        """Generate a payload block with the settings in this PayloadBundleSettings. bundle_num is ignored.
         
-        :param int bundle_num: the number of the bundle being generated \
-            (0 to ...)
+        :param int bundle_num: the number of the bundle being generated (0 to ...). In this case this value is ignored.
 
         :return: The generated Payload block
         :rtype: PayloadBlock
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            generated_payload_block = payload_block_settings.generate(0)
         """
         # generate a random byte string payload of the specified size in bytes
         generated_payload = os.urandom(self.payload_size)
@@ -779,24 +1087,37 @@ class PrimaryBlock(Block):
     ):
         """Initialize the primary block with the requested fields.
 
-        :param int version: (optional) version of the Bundle Protocol that \
-            constructed this block
-        :param BundlePCFlags control_flags: (optional) bundle processing \
-            control flags
+        :param int version: (optional) version of the Bundle Protocol that constructed this block
+        :param BundlePCFlags control_flags: (optional) bundle processing control flags
         :param CRCType crc_type: (optional) CRC type
-        :param EID dest_eid: (optional) bundle endpoint that is the bundle's \
-            destination
+        :param EID dest_eid: (optional) bundle endpoint that is the bundle's destination
         :param EID src_eid: (optional) bundle node at which the bundle was \
-            initially transmitted, or null endpoint if anomymous
+initially transmitted, or null endpoint if anomymous
         :param EID rpt_eid: (optional) bundle endpoint to which status reports \
-            pertaining to the forwarding and delivery of this bundle are to be \
-            transmitted
-        :param CreationTimestamp creation_timestamp: (optional) creation \
-            timestamp
+pertaining to the forwarding and delivery of this bundle are to be transmitted
+        :param CreationTimestamp creation_timestamp: (optional) creation timestamp
         :param int lifetime: (optional) number of milliseconds past the \
-            creation time at which the bundle's payload will no longer be useful
-        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
-            calculate it
+creation time at which the bundle's payload will no longer be useful
+        :param bytes crc: (optional) crc value or CRCFlag.CALCULATE to calculate it
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.blocks import PrimaryBlock
+            from dtngen.types import BundlePCFlags, CRCType, CRCFlag, EID, CreationTimestamp
+            
+            primary_block = PrimaryBlock(
+                version=7,
+                control_flags=BundlePCFlags.MUST_NOT_FRAGMENT,
+                crc_type=CRCType.CRC16_X25,
+                dest_eid=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
+                src_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+                rpt_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+                creation_timestamp=CreationTimestamp({"time": 755533838904, "sequence": 0}),
+                lifetime=3600000,
+                crc=CRCFlag.CALCULATE,
+            )
         """
         if not isinstance(version, int):
             warnmsg = f'PrimaryBlock version is type {type(version).__name__} instead of int'
@@ -848,6 +1169,12 @@ class PrimaryBlock(Block):
 
         :return: A CBOR-encoded block
         :rtype: bytearray
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            cbor_encoded_prb = primary_block.encode()
         """
         if self.crc is CRCFlag.CALCULATE and self.crc_type is not None \
             and self.crc_type >= 1 and self.crc_type <= 2:
@@ -887,6 +1214,12 @@ class PrimaryBlock(Block):
 
         :return: A json-encoded block
         :rtype: string
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            prb_json = primary_block.to_json()
         """
         if self.crc is CRCFlag.CALCULATE and self.crc_type is not None \
             and self.crc_type >= 1 and self.crc_type <= 2:
@@ -925,11 +1258,19 @@ class PrimaryBlock(Block):
     def decode(cls, cand_block):
         """Attempt to decode the candidate block as a BPv7 Primary Block.
 
-        :params list cand_block: A list of objects to be interpreted as a \
-            Primary Block.
+        :params list cand_block: A list of objects to be interpreted as a Primary Block.
             
         :return: A Primary Block
         :rtype: PrimaryBlock
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.blocks import PrimaryBlock
+            
+            prblock_elements = [7, 4, 1, [2, [200, 1]], [2, [100, 1]], [2, [100, 1]], [755533838904, 0], 3600000, b'\\x0b\\x19']
+            prblock = PrimaryBlock.decode(prblock_elements)
         """
         blen = len(cand_block)
         
@@ -966,29 +1307,64 @@ class PrimaryBlockSettings:
     ):
         """Initialize the primary block with the requested fields.
 
-        :param int version: (optional) version of the Bundle Protocol that \
-            constructed this block
-        :param BundlePCFlags control_flags: (optional) bundle processing \
-            control flags
+        :param int version: (optional) version of the Bundle Protocol that constructed this block
+        :param BundlePCFlags control_flags: (optional) bundle processing control flags
         :param CRCType crc_type: (optional) CRC type
-        :param EID dest_eid: (optional) bundle endpoint that is the bundle's \
-            destination
+        :param EID dest_eid: (optional) bundle endpoint that is the bundle's destination
         :param EID src_eid: (optional) bundle node at which the bundle was \
-            initially transmitted, or null endpoint if anomymous
+initially transmitted, or null endpoint if anomymous
         :param EID rpt_eid: (optional) bundle endpoint to which status reports \
-            pertaining to the forwarding and delivery of this bundle are to be \
-            transmitted
-        :param dict creation_timestamp: (optional) creation timestamp \
-                generation settings\n
+pertaining to the forwarding and delivery of this bundle are to be transmitted
+        :param dict creation_timestamp: (optional) creation timestamp generation settings\n
             {\n
-                "time": "current" or {"start": <start_time>, "increment": \
-                    <ms between bundles>},\n
+                "time": "current" or {"start": <start_time>, "increment": <ms between bundles>},\n
                 "sequence": {"start": <start value>} or {"fixed": <fixed value>}\n
             }
         :param int lifetime: (optional) number of milliseconds past the \
-            creation time at which the bundle's payload will no longer be useful
-        :param bytes crc: (optional) crc value or types.CRCFlag.CALCULATE to \
-            calculate it
+creation time at which the bundle's payload will no longer be useful
+        :param bytes crc: (optional) crc value or CRCFlag.CALCULATE to calculate it
+
+        *Usage:*
+        
+        PrimaryBlockSettings with creation_timestamp \"time\" set to a specific
+        value and an increment value and \"sequence\" set to an incrementing
+        value:
+        
+        .. code-block:: python
+        
+            from dtngen.blocks import PrimaryBlockSettings
+
+            # PrimaryBlockSettings is like PrimaryBlock except the
+            # creation_timestamp has generation settings for the time and
+            # sequence instead of explicit values
+            primaryblk_settings = PrimaryBlockSettings(
+                version=7,
+                control_flags=BundlePCFlags.MUST_NOT_FRAGMENT,
+                crc_type=CRCType.CRC16_X25,
+                dest_eid=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
+                src_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+                rpt_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+                creation_timestamp={
+                    "time": {"start": 755533838904, "increment": 256}, 
+                    "sequence": {"start": 0} 
+                },
+                lifetime=3600000,
+                crc=CRCFlag.CALCULATE,
+
+        PrimaryBlockSettings with creation_timestamp \"time\" set to current DTN
+        time and \"sequence\" set to a fixed value:
+        
+        .. code-block:: python
+        
+            from dtngen.blocks import PrimaryBlockSettings
+
+            primaryblk_settings = PrimaryBlockSettings(
+                ...
+                creation_timestamp={
+                    "time": "current", 
+                    "sequence": {"fixed": 5} 
+                },
+                ...
         """
         self.version = version
         self.control_flags = control_flags
@@ -1049,14 +1425,18 @@ fixed, but \"fixed\" value is not an int")
 value is not an int")
 
     def generate(self, bundle_num):
-        """Generate a Primary Block with the settings in this \
-            PayloadBundleSettings and the given bundle number.
+        """Generate a Primary Block with the settings in this PayloadBundleSettings and the given bundle number.
         
-        :param int bundle_num: the number of the bundle being generated \
-            (0 to ...)
+        :param int bundle_num: the number of the bundle being generated (0 to ...)
 
         :return: The generated Primary block
         :rtype: PrimaryBlock
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            generated_primary_block = primary_block_settings.generate(3)
         """
 
         if self.cts_time_current:
@@ -1086,7 +1466,7 @@ value is not an int")
 
 
 class UnknownBlock(Block):
-    """Unknown Block."""
+    """Unknown Block. Used to handle blocks of an unknown type."""
 
     def __init__(
         self,
@@ -1095,6 +1475,24 @@ class UnknownBlock(Block):
         """Initialize the unknown block with the requested fields.
 
         :param list elements: list of all of the elements of the block
+        
+        *Usage:*
+        
+        .. code-block:: python
+        
+            from dtngen.blocks import UnknownBlock
+            
+            unknown_block = UnknownBlock(
+                elements=
+                [
+                    73,
+                    73,
+                    0,
+                    1,
+                    b'\\x82\\x02\\x82\\x18\\x64\\x0a',
+                    b'\\x67\\x47'
+                ]
+            )
         """
         self.elements = elements
 
@@ -1103,6 +1501,12 @@ class UnknownBlock(Block):
 
         :return: A CBOR-encoded block
         :rtype: bytes
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            cbor_encoded_unknown = unknown_block.encode()
         """
         if isinstance(self.elements, list):
             fields = [i for i in self.elements if i is not None]
@@ -1117,6 +1521,12 @@ class UnknownBlock(Block):
 
         :return: A json-encoded block
         :rtype: string
+
+        *Usage:*
+        
+        .. code-block:: python
+        
+            unknown_json = unknown_block.to_json()
         """
         if isinstance(self.elements, list):
             fields = [i for i in self.elements if i is not None]
@@ -1128,9 +1538,17 @@ class UnknownBlock(Block):
 
     @classmethod
     def decode(cls, cand_block):
-        """Attempt to decode the candidate block as an Unknown Block.
+        """Decode the candidate block as an Unknown Block.
 
-        :params list cand_block: A list of objects to be interpreted as a \
-            Unknown Block.
+        :params list cand_block: A list of objects to be interpreted as a Unknown Block.
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.blocks import UnknownBlock
+            
+            ublock_elements = [73, 73, 0, 1, b'\\x82\\x02\\x82\\x18\\x64\\x0a', b'\\x67\\x47'] 
+            ublock = UnknownBlock.decode(ublock_elements)
         """
         return UnknownBlock(elements=cand_block)            

@@ -1,29 +1,34 @@
 import codecs
 
-from dtngen import (
-    EID,
+from dtngen.blocks import (
+    CanonicalBlock,
+    PrevNodeBlock,
+    BundleAgeBlock,
+    HopCountBlock,
+    CustodyTransferBlock,
+    CompressedReportingBlock,
+    PayloadBlock,
+    PayloadBlockSettings,
+    PrimaryBlock,
+    PrimaryBlockSettings,
+    UnknownBlock,
+)
+
+from dtngen.bundle import Bundle
+
+from dtngen.types import (
+    TypeWarning,
     BlockPCFlags,
     BlockType,
-    Bundle,
-    BundleAgeBlock,
     BundlePCFlags,
     StatusRRFlags,
     CRCFlag,
     CRCType,
+    EID,
     CreationTimestamp,
     HopCountData,
     CTEBData,
     CREBData,
-    HopCountBlock,
-    PayloadBlockSettings,
-    PayloadBlock,
-    PrevNodeBlock,
-    CustodyTransferBlock,
-    CompressedReportingBlock,
-    PrimaryBlockSettings,
-    PrimaryBlock,
-    UnknownBlock,
-    TypeWarning,
 )
 
 import warnings
@@ -116,7 +121,7 @@ primary_block = PrimaryBlock(
 )
 
 prev_node_block = PrevNodeBlock(
-    blk_type=BlockType.PREVIOUS_NODE,
+    blk_type=BlockType.AUTO,
     blk_num=6,
     control_flags=0,
     crc_type=CRCType.CRC16_X25,
@@ -125,7 +130,7 @@ prev_node_block = PrevNodeBlock(
 )
 
 bundle_age_block = BundleAgeBlock(
-    blk_type=BlockType.BUNDLE_AGE,
+    blk_type=BlockType.AUTO,
     blk_num=2,
     control_flags=BlockPCFlags.FRAG_REPLICATE | BlockPCFlags.DEL_UNPROC,
     crc_type=CRCType.CRC16_X25,
@@ -134,7 +139,7 @@ bundle_age_block = BundleAgeBlock(
 )
 
 hop_count_block = HopCountBlock(
-    blk_type=BlockType.HOP_COUNT,
+    blk_type=BlockType.AUTO,
     blk_num=3,
     control_flags=BlockPCFlags.FRAG_REPLICATE,
     crc_type=CRCType.CRC16_X25,
@@ -143,7 +148,7 @@ hop_count_block = HopCountBlock(
 )
 
 cte_block = CustodyTransferBlock(
-    blk_type=BlockType.CUST_TRANS_EXT,
+    blk_type=BlockType.AUTO,
     blk_num=4,
     control_flags=BlockPCFlags.REP_UNPROC,
     crc_type=CRCType.CRC16_X25,
@@ -156,7 +161,7 @@ cte_block = CustodyTransferBlock(
 )
 
 cre_block = CompressedReportingBlock(
-    blk_type=BlockType.COMP_RPT_EXT,
+    blk_type=BlockType.AUTO,
     blk_num=5,
     control_flags=0,
     crc_type=CRCType.CRC16_X25,
@@ -171,7 +176,7 @@ cre_block = CompressedReportingBlock(
 )
 
 payload_block = PayloadBlock(
-    blk_type=BlockType.BUNDLE_PAYLOAD,
+    blk_type=BlockType.AUTO,
     blk_num=1,
     control_flags=0,
     crc_type=CRCType.CRC16_X25,
@@ -354,7 +359,7 @@ primary_block = PrimaryBlock(
 )
 
 prev_node_block = PrevNodeBlock(
-    blk_type=BlockType.PREVIOUS_NODE,
+    blk_type=BlockType.AUTO,
     blk_num=6,
     control_flags=0,
 #     crc_type=CRCType.CRC16_X25,
@@ -363,7 +368,7 @@ prev_node_block = PrevNodeBlock(
 )
 
 bundle_age_block = BundleAgeBlock(
-    blk_type=BlockType.BUNDLE_AGE,
+    blk_type=BlockType.AUTO,
     blk_num=2,
 #     control_flags=BlockPCFlags.FRAG_REPLICATE | BlockPCFlags.DEL_UNPROC,
     crc_type=CRCType.CRC16_X25,
@@ -372,7 +377,7 @@ bundle_age_block = BundleAgeBlock(
 )
 
 hop_count_block = HopCountBlock(
-#     blk_type=BlockType.HOP_COUNT,
+#     blk_type=BlockType.AUTO,
     blk_num=3,
     control_flags=BlockPCFlags.FRAG_REPLICATE,
     crc_type=CRCType.CRC16_X25,
@@ -382,7 +387,7 @@ hop_count_block = HopCountBlock(
 )
 
 cte_block = CustodyTransferBlock(
-    blk_type=BlockType.CUST_TRANS_EXT,
+    blk_type=BlockType.AUTO,
     blk_num=4,
     control_flags=BlockPCFlags.REP_UNPROC,
     crc_type=CRCType.CRC16_X25,
@@ -395,7 +400,7 @@ cte_block = CustodyTransferBlock(
 )
 
 cre_block = CompressedReportingBlock(
-    blk_type=BlockType.COMP_RPT_EXT,
+    blk_type=BlockType.AUTO,
     blk_num=5,
 #     control_flags=0,
     crc_type=CRCType.CRC16_X25,
@@ -410,7 +415,7 @@ cre_block = CompressedReportingBlock(
 )
 
 payload_block = PayloadBlock(
-    blk_type=BlockType.BUNDLE_PAYLOAD,
+    blk_type=BlockType.AUTO,
 #     blk_num=1,
     control_flags=0,
     crc_type=CRCType.CRC16_X25,
@@ -746,9 +751,9 @@ cte_block = CustodyTransferBlock(
     blk_num=4,
     control_flags=BlockPCFlags.REP_UNPROC,
     crc_type=CRCType.CRC16_X25,
-    cteb_data=CTEBData( \
-        {"trans_id": 10, \
-        "trans_series_id": 2, \
+    cteb_data=CTEBData(
+        {"trans_id": 10,
+        "trans_series_id": 2,
         "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}})}
     ),
     crc=CRCFlag.CALCULATE,
@@ -759,11 +764,11 @@ cre_block = CompressedReportingBlock(
     blk_num=5,
     control_flags=0,
     crc_type=CRCType.CRC16_X25,
-    creb_data=CREBData( \
-        {"bundle_seq_num": 1, \
-        "bundle_seq_id": 4, \
-        "rpt_request_flags": 0, \
-        "scope_node_id": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}), \
+    creb_data=CREBData(
+        {"bundle_seq_num": 1,
+        "bundle_seq_id": 4,
+        "rpt_request_flags": 0,
+        "scope_node_id": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
         "rpt_eid": EID({"uri": 2, "ssp": {"node_num": 305, "service_num": 2}})}
     ),
     crc=CRCFlag.CALCULATE,
@@ -888,7 +893,7 @@ primary_block_settings = PrimaryBlockSettings(
 # Payload block setting is like in creating a payload block, except for the
 # payload which is a dictionary with the size of payload to generate (in bytes)
 payload_block_settings = PayloadBlockSettings(
-    blk_type=BlockType.BUNDLE_PAYLOAD,
+    blk_type=BlockType.AUTO,
     blk_num=1,
     control_flags=0,
     crc_type=CRCType.CRC16_X25,
@@ -936,7 +941,7 @@ primary_block_settings = PrimaryBlockSettings(
 )
 
 payload_block_settings = PayloadBlockSettings(
-    blk_type=BlockType.BUNDLE_PAYLOAD,
+    blk_type=BlockType.AUTO,
     blk_num=1,
     control_flags=0,
     crc_type=CRCType.CRC16_X25,
@@ -976,7 +981,7 @@ primary_block = PrimaryBlock(
 
 # Create a payload block with payload that is not bytes (which is invalid)
 payload_block = PayloadBlock(
-    blk_type=BlockType.BUNDLE_PAYLOAD,
+    blk_type=BlockType.AUTO,
     blk_num=1,
     control_flags=0,
     crc_type=1,
