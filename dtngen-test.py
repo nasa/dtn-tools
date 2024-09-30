@@ -793,6 +793,10 @@ wrong_block_types_bundle = Bundle(
 wrong_types_bytes = wrong_block_types_bundle.to_bytes()
 print(f'wrong_types_bytes:\n{codecs.encode(wrong_types_bytes,"hex")}\n')
 
+wrong_block_types_bundle.to_json_file("wrongtypes.json")
+wrong_types_bundle_back = Bundle.from_json_file("wrongtypes.json")
+wrong_types_bundle_back.to_json_file("wrongtypesback.json")
+
 from_wrong_bundle = Bundle.from_bytes(wrong_types_bytes)
 from_wrong_bundle_bytes = from_wrong_bundle.to_bytes()
 print(f'\nfrom_wrong_bundle_bytes:\n{codecs.encode(from_wrong_bundle_bytes,"hex")}\n')

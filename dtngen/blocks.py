@@ -81,6 +81,9 @@ class CanonicalBlock(Block):
 
         :param list cand_block: A list representing the candidate Canonical Block
 
+        :return: A dictionary containing the common data for the block
+        :rtype: dict
+
         .. important::
         
             CanonicalBlock methods should not normally be called by the user,
@@ -110,8 +113,10 @@ class CanonicalBlock(Block):
 
         return block_fields
         
-    def encode(self, type_spec_data):
+    def encode(self, type_spec_data=None):
         """Encode the canonical block using CBOR with the type-specific data.
+
+        :param any type_spec_data: (optional) the type specific data
 
         :return: A CBOR-encoded block
         :rtype: bytearray
@@ -153,9 +158,12 @@ class CanonicalBlock(Block):
         return cbor2.dumps(cfields, default=default_encoder)
 
         
-    def to_json(self, type_spec_data=None):
+    def to_json(self, type_spec_key, type_spec_data=None):
         """Encode the canonical block using json with the type-specific data.
 
+        :param string type_spec_key: the key to use for the type specific data
+        :param any type_spec_data: (optional) the type specific data
+        
         :return: A json-encoded block
         :rtype: string
 
@@ -185,6 +193,7 @@ class CanonicalBlock(Block):
         
         tmp = \
             [
+                self.__class__.__name__,
                 self.blk_type,
                 self.blk_num,
                 self.control_flags,
@@ -193,8 +202,9 @@ class CanonicalBlock(Block):
                 self.crc,
             ]
         cfields = [i for i in tmp if i is not None]
-
-        return json.dumps(cfields, default=custom_encoder, indent=4)
+        keys = ["_block_class", "blk_type", "blk_num", "control_flags", "crc_type", type_spec_key, "crc"]
+        
+        return json.dumps(dict(zip(keys, cfields)), default=custom_encoder, indent=4)
 
 
 class PrevNodeBlock(CanonicalBlock):
@@ -276,7 +286,7 @@ class PrevNodeBlock(CanonicalBlock):
         
             pnb_json = prev_node_block.to_json()
         """
-        return super().to_json(self.get_type_spec())
+        return super().to_json(type_spec_key="prev_eid", type_spec_data=self.get_type_spec())
         
     @classmethod
     def decode(cls, cand_block):
@@ -400,7 +410,7 @@ calculate it
         
             bab_json = bundle_age_block.to_json()
         """
-        return super().to_json(self.get_type_spec())
+        return super().to_json(type_spec_key="bundle_age", type_spec_data=self.get_type_spec())
 
     @classmethod
     def decode(cls, cand_block):
@@ -523,7 +533,7 @@ node to another
         
             hcb_json = hop_count_block.to_json()
         """
-        return super().to_json(self.get_type_spec())
+        return super().to_json(type_spec_key="hop_data", type_spec_data=self.get_type_spec())
 
     @classmethod
     def decode(cls, cand_block):
@@ -651,7 +661,7 @@ reg_orig_eid EID of the originator of the custody request
         
             ctb_json = custody_transfer_block.to_json()
         """
-        return super().to_json(self.get_type_spec())
+        return super().to_json(type_spec_key="cteb_data", type_spec_data=self.get_type_spec())
 
     @classmethod
     def decode(cls, cand_block):
@@ -784,7 +794,7 @@ class CompressedReportingBlock(CanonicalBlock):
         
             cbor_encoded_crb = compressed_reporting_block.to_json()
         """
-        return super().to_json(self.get_type_spec())
+        return super().to_json(type_spec_key="creb_data", type_spec_data=self.get_type_spec())
 
     @classmethod
     def decode(cls, cand_block):
@@ -954,6 +964,7 @@ class PayloadBlock(CanonicalBlock):
             
         tmp = \
             [
+                self.__class__.__name__,
                 self.blk_type,
                 self.blk_num,
                 self.control_flags,
@@ -962,8 +973,9 @@ class PayloadBlock(CanonicalBlock):
                 self.crc,
             ]
         cfields = [i for i in tmp if i is not None]
-
-        return json.dumps(cfields, default=custom_encoder, indent=4)
+        keys = ["_block_class", "blk_type", "blk_num", "control_flags", "crc_type", "payload", "crc"]
+        
+        return json.dumps(dict(zip(keys, cfields)), default=custom_encoder, indent=4)
 
     @classmethod
     def decode(cls, cand_block):
@@ -1239,6 +1251,7 @@ creation time at which the bundle's payload will no longer be useful
         
         tmp = \
             [
+                self.__class__.__name__,
                 self.version,
                 self.control_flags,
                 self.crc_type,
@@ -1250,8 +1263,9 @@ creation time at which the bundle's payload will no longer be useful
                 self.crc,
             ]
         fields = [i for i in tmp if i is not None]
-
-        return json.dumps(fields, default=custom_encoder, indent=4)
+        keys = ["_block_class", "version", "control_flags", "crc_type", "dest_eid", "src_eid", "rpt_eid", "creation_timestamp", "lifetime", "crc"]
+        
+        return json.dumps(dict(zip(keys, fields)), default=custom_encoder, indent=4)
         
 
     @classmethod
@@ -1529,11 +1543,13 @@ class UnknownBlock(Block):
             unknown_json = unknown_block.to_json()
         """
         if isinstance(self.elements, list):
-            fields = [i for i in self.elements if i is not None]
+            fields = [self.__class__.__name__] + [i for i in self.elements if i is not None]
         else:
-            fields = self.elements
+            fields = [self.__class__.__name__, self.elements]
 
-        return json.dumps(fields, default=custom_encoder, indent=4)
+        keys = ["_block_class"] + [f'Element {i}' for i in range(1, len(fields)+1)]
+        
+        return json.dumps(dict(zip(keys, fields)), default=custom_encoder, indent=4)
         
 
     @classmethod

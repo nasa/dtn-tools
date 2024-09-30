@@ -260,31 +260,40 @@ class Bundle:
         canon_blocks = None
         
         if isinstance(jsondata, list) and len(jsondata) >=1:
-            pri_block = PrimaryBlock(*jsondata[0])
+            # The blocks are dicts - get the block element values, skipping the
+            # first one, "_block_class"
+            pri_block = PrimaryBlock(*list(jsondata[0].values())[1:])
     
             canon_blocks = []
             for block in jsondata[1:]:
-                block_type = block[0]
+                block_vals = list(block.values())
+                block_type = block_vals[1]
                 block_cls = cls._block_lookup.get(block_type, None)
+                if not block_cls.__name__ == block_vals[0]:
+                    warnmsg = f'Encoded block class {block_cls.__name__} not equal to _block_class {block_vals[0]}.'
+                    warnings.warn(warnmsg)
+
+                # Remove _block_class element
+                block_vals = block_vals[1:]
                 if block_cls:
                     if block_cls == HopCountBlock \
                             or block_cls == CustodyTransferBlock \
                             or block_cls == CompressedReportingBlock:
-                        block = _flatten(block)
+                        block_vals = _flatten(block_vals)
                     if block_cls == CompressedReportingBlock:
-                        if len(block) >= 4 and isinstance(block[3], int) \
-                            and block[3] >= 1 and block[3] <= 2:
-                                crc_val = block[-1]
-                                block = block[:-1]
-                                canon_blocks.append(block_cls(*block, crc=crc_val))
+                        if len(block_vals) >= 4 and isinstance(block_vals[3], int) \
+                            and block_vals[3] >= 1 and block_vals[3] <= 2:
+                                crc_val = block_vals[-1]
+                                block_vals = block_vals[:-1]
+                                canon_blocks.append(block_cls(*block_vals, crc=crc_val))
                         else:
-                            canon_blocks.append(block_cls(*block))
+                            canon_blocks.append(block_cls(*block_vals))
                     else:
-                        canon_blocks.append(block_cls(*block))
+                        canon_blocks.append(block_cls(*block_vals))
                 else:
                     warnmsg = f'Unknown block type {block_type}. Adding as UnknownBlock.'
                     warnings.warn(warnmsg)
-                    canon_blocks.append(UnknownBlock.decode(block))
+                    canon_blocks.append(UnknownBlock.decode(block_vals))
 
         return Bundle(pri_block, canon_blocks)
 
