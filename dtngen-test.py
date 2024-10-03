@@ -1018,3 +1018,12 @@ print(f'\nbadpayload = {codecs.encode(ba[47:50], "hex")}')
 assert(ba[47] == 0x19)   # A CBOR unsigned int in two bytes (additional info 25)
 assert(ba[48] == 0x12)
 assert(ba[49] == 0x34)
+
+# Generate a junk random bundle (random data unit) and print it out as hex
+junk_bundle = Bundle.generate_random(size=256)
+print(f'\njunk_bundle = {codecs.encode(junk_bundle, "hex")}')
+
+# Generate a junk random bundle of maximum size and write it to a binary file.
+# Note that it also is returned from the method, but here we do not do anything
+# with it
+Bundle.generate_random(size=10*1024*1024, filename="junk.bin")

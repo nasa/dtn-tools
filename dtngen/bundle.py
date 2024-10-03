@@ -4,6 +4,7 @@ import traceback
 import cbor2
 import warnings
 import time
+import os
 
 from .blocks import (
     BundleAgeBlock,
@@ -387,8 +388,43 @@ class Bundle:
             
             bundles.append(Bundle(pri_block, canon_blocks))
         return bundles
-        
 
+
+    @classmethod
+    def generate_random(cls, size, filename=None):
+        """Generate junk bundle data with the specified number of random bytes.
+
+        :param int size: The size in bytes of the junk bundle to create
+        :param str filename: (optional) filename to write the data to
+
+        :return: The generated junk bundle data
+        :rtype: bytes
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.bundle import Bundle
+
+            # The size is required and is the size in bytes of the junk bundle
+            # to create. The filename is optional. If provided the bundle will
+            # be written to that filename. In all cases the bundle is returned
+            # as bytes, but in this example the return value is discarded.
+            Bundle.generate_random(size=1024, filename="junk.bin")
+            
+            # If the filename is left out, no file will be written but the
+            # junk bundle is returned as bytes
+            junk_large = Bundle.generate_random(size=10*1024*1024)
+        """
+        junk_bytes = os.urandom(size)
+        
+        if filename and isinstance(filename, str):
+            with open(filename, "wb") as bytes_file:
+                bytes_file.write(junk_bytes)
+        
+        return junk_bytes
+
+        
 def _flatten(non_flat_list):
     flat = []
     for e in non_flat_list:
