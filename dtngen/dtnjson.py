@@ -1,6 +1,7 @@
 import base64
 
-from .types import EID, CreationTimestamp, HopCountData, CTEBData, CREBData
+from .types import EID, CreationTimestamp, HopCountData, CTEBData, CREBData, \
+    InvalidCBOR
 
 def custom_encoder(x):
     """JSON encode values in a non-default way."""
@@ -37,6 +38,12 @@ def custom_encoder(x):
                 "rpt_request_flags": x.rpt_request_flags, \
                 "scope_node_id": x.scope_node_id, \
                 "rpt_eid": x.rpt_eid},
+        }
+    elif isinstance(x, InvalidCBOR):
+        return {
+            "type": "InvalidCBOR",
+            "value": {"value": x.value, \
+                "additional_info": x.additional_info},
         }
     else:
         raise TypeError(f'Object of type {type(x)} is not JSON serializable')
@@ -75,6 +82,11 @@ def custom_decoder(x):
                     "scope_node_id": x["value"]["scope_node_id"], \
                     "rpt_eid": x["value"]["rpt_eid"],
             }
+        )
+    elif x.get("type") == "InvalidCBOR":
+        return InvalidCBOR(
+            value = x["value"]["value"], \
+                additional_info = x["value"]["additional_info"],
         )
     else:
         return x

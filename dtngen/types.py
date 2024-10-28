@@ -114,6 +114,63 @@ def calc_crc(crc_type, fields):
     else:
         return None
 
+class InvalidCBOR:
+    """Invalid CBOR Encoding."""
+
+    def __init__(self, value, additional_info):
+        """Initialize the InvalidCBOR.
+
+        :param any value: The CBOR-encodable value
+        :param int additional_info: The invalid additional info value to set. Must be 28-30 or 31. 31 is only invalid for major types 0, 1 and 6.
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.types import InvalidCBOR
+            
+            invalid_cbor_eid = \\
+                InvalidCBOR(
+                    value=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
+                    additional_info=28
+                )
+                
+            invalid_cbor_uint = InvalidCBOR(value=360000, additional_info=31)
+
+        """
+        if not additional_info in [28, 29, 30, 31]:
+            err_msg = f'Attempting to create invalid CBOR encoding, but the \
+specified additional info value {additional_info} is NOT invalid. Only values \
+28-31 are invalid.'
+            raise ValueError(err_msg)
+        
+        self.value = value
+        self.additional_info = additional_info
+        
+        cbor_val = cbor2.dumps(self.value, default=default_encoder)
+        major_type = (cbor_val[0] & 0b11100000) >> 5
+        
+        if additional_info == 31 and not major_type in [0, 1, 6]:
+            err_msg = f'Attempting to create invalid CBOR encoding for \
+a value of major type {major_type}, but the specified \
+additional info value 31 is only invalid for major types 0, 1 \
+and 6.'
+            raise ValueError(err_msg)
+        
+    def enc_data(self):
+        """Return the data to encode.
+
+        :return: dictionary containing the value to encode and the invalid additional info
+        :rtype: dict
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            data = myinvalidcbor.enc_data()
+        """
+        return {'value': self.value, 'additional_info': self.additional_info}
+        
 
 class EID:
     """Endpoint Identifier."""
@@ -717,5 +774,16 @@ def default_encoder(encoder, value):
     
     if class_name in class_list:
         encoder.encode(value.enc_data())
+    elif class_name is 'InvalidCBOR':
+        # Encode the value as normal
+        cbor_val = bytearray(cbor2.dumps(value.enc_data()["value"], default=default_encoder))
+
+        # Replace the additional info of the first byte with the invalid
+        # additional info
+        cbor_val[0] &= 0b11100000
+        cbor_val[0] |= value.enc_data()["additional_info"]
+        
+        # Write the modified encoding to the stream
+        encoder.write(bytes(cbor_val))
     else:
         raise cbor2.CBOREncodeTypeError(f'cannot serialize type {type(value)}')

@@ -29,6 +29,8 @@ from .types import (
     HopCountData,
     CTEBData,
     CREBData,
+    InvalidCBOR,
+    calc_crc,
 )
 
 __all__ = [
@@ -48,6 +50,8 @@ __all__ = [
     "HopCountData",
     "CTEBData",
     "CREBData",
+    "InvalidCBOR",
+    "calc_crc",
     # Blocks
     "Block",
     "BundleAgeBlock",

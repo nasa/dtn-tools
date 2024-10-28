@@ -29,9 +29,12 @@ from dtngen.types import (
     HopCountData,
     CTEBData,
     CREBData,
+    InvalidCBOR,
 )
 
 import warnings
+import traceback
+import copy
 
 # Display every warning - by default it only shows the first warning of the type
 # and message content, from a specific line of code. Or set it to "ignore" to
@@ -152,9 +155,9 @@ cte_block = CustodyTransferBlock(
     blk_num=4,
     control_flags=BlockPCFlags.REP_UNPROC,
     crc_type=CRCType.CRC16_X25,
-    cteb_data=CTEBData( \
-        {"trans_id": 10, \
-        "trans_series_id": 2, \
+    cteb_data=CTEBData(
+        {"trans_id": 10,
+        "trans_series_id": 2,
         "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}})}
     ),
     crc=CRCFlag.CALCULATE,
@@ -165,11 +168,11 @@ cre_block = CompressedReportingBlock(
     blk_num=5,
     control_flags=0,
     crc_type=CRCType.CRC16_X25,
-    creb_data=CREBData( \
-        {"bundle_seq_num": 1, \
-        "bundle_seq_id": 4, \
-        "rpt_request_flags": 0, \
-        "scope_node_id": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}), \
+    creb_data=CREBData(
+        {"bundle_seq_num": 1,
+        "bundle_seq_id": 4,
+        "rpt_request_flags": 0,
+        "scope_node_id": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
         "rpt_eid": EID({"uri": 2, "ssp": {"node_num": 305, "service_num": 2}})}
     ),
     crc=CRCFlag.CALCULATE,
@@ -187,7 +190,7 @@ payload_block = PayloadBlock(
 # Use them to create a bundle object
 bundle = Bundle(
     pri_block=primary_block,
-    canon_blocks=[prev_node_block, bundle_age_block, hop_count_block, \
+    canon_blocks=[prev_node_block, bundle_age_block, hop_count_block,
         cte_block, cre_block, payload_block],
 )
 
@@ -391,9 +394,9 @@ cte_block = CustodyTransferBlock(
     blk_num=4,
     control_flags=BlockPCFlags.REP_UNPROC,
     crc_type=CRCType.CRC16_X25,
-    cteb_data=CTEBData( \
-        {"trans_id": 10, \
-#          "trans_series_id": 2, \
+    cteb_data=CTEBData(
+        {"trans_id": 10,
+#          "trans_series_id": 2,
         "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}})}
     ),
     crc=CRCFlag.CALCULATE,
@@ -404,11 +407,11 @@ cre_block = CompressedReportingBlock(
     blk_num=5,
 #     control_flags=0,
     crc_type=CRCType.CRC16_X25,
-    creb_data=CREBData( \
-        {"bundle_seq_num": 1, \
-        "bundle_seq_id": 4, \
-#         "rpt_request_flags": 0, \
-#         "scope_node_id": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}), \
+    creb_data=CREBData(
+        {"bundle_seq_num": 1,
+        "bundle_seq_id": 4,
+#         "rpt_request_flags": 0,
+#         "scope_node_id": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
         "rpt_eid": EID({"uri": 2, "ssp": {"node_num": 305, "service_num": 2}})}
     ),
     crc=CRCFlag.CALCULATE,
@@ -426,7 +429,7 @@ payload_block = PayloadBlock(
 # Use them to create a bundle object
 bundle_with_errors = Bundle(
     pri_block=primary_block,
-    canon_blocks=[prev_node_block, bundle_age_block, hop_count_block, \
+    canon_blocks=[prev_node_block, bundle_age_block, hop_count_block,
         cte_block, cre_block, payload_block],
 )
 
@@ -786,7 +789,7 @@ payload_block = PayloadBlock(
 # Use them to create a bundle object
 wrong_block_types_bundle = Bundle(
     pri_block=primary_block,
-    canon_blocks=[prev_node_block, bundle_age_block, hop_count_block, \
+    canon_blocks=[prev_node_block, bundle_age_block, hop_count_block,
         cte_block, cre_block, payload_block],
 )
 
@@ -1021,9 +1024,124 @@ assert(ba[49] == 0x34)
 
 # Generate a junk random bundle (random data unit) and print it out as hex
 junk_bundle = Bundle.generate_random(size=256)
-print(f'\njunk_bundle = {codecs.encode(junk_bundle, "hex")}')
+print(f'\njunk_bundle = {codecs.encode(junk_bundle, "hex")}\n')
 
 # Generate a junk random bundle of maximum size and write it to a binary file.
 # Note that it also is returned from the method, but here we do not do anything
 # with it
 Bundle.generate_random(size=10*1024*1024, filename="junk.bin")
+
+
+# Create a Primary Block with invalid CBOR encoding of the lifetime. Here the
+# additional info is changed to 31, which because this is major type 0 (unsigned
+# integer) is an invalid additional info value. Note that you set "value" to the
+# valid value. "additional_info" is the invalid additional info value you want
+# to set to make it invalid. To make it invalid, it needs to be 28-30 or 31.
+
+# First create a good PrimaryBlock:
+primary_block = PrimaryBlock(
+    version=7,
+    control_flags=BundlePCFlags.MUST_NOT_FRAGMENT,
+    crc_type=CRCType.CRC16_X25,
+    dest_eid=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
+    src_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+    rpt_eid=EID({"uri": 2, "ssp": {"node_num": 300, "service_num": 1}}),
+    creation_timestamp=CreationTimestamp({"time": 755533838904, "sequence": 0}),
+    lifetime = 3600000,
+    crc=CRCFlag.CALCULATE,
+)
+
+# Use it to create a good bundle object
+good_cbor_bundle = Bundle(
+    pri_block=copy.deepcopy(primary_block),
+)
+
+# Encode it to bytes, which contains the good CBOR encoding
+good_cbor_encoded = good_cbor_bundle.to_bytes()
+
+# Now create the bad cbor encoded bundle by modifying the good one. 
+orig_lifetime = primary_block.lifetime
+primary_block.lifetime = InvalidCBOR(value=orig_lifetime, additional_info=31)
+
+# Use it to create a bundle object
+bad_cbor_bundle = Bundle(
+    pri_block=copy.deepcopy(primary_block),
+)
+
+# Encode it to bytes, which contains the invalid CBOR encoding
+bad_cbor_encoded = bad_cbor_bundle.to_bytes()
+bad_cbor_bundle.to_bytes_file("bad_cbor_bundle.bin")
+
+print(f'\ngood_cbor = {codecs.encode(good_cbor_encoded, "hex")}')
+print(f' bad_cbor = {codecs.encode(bad_cbor_encoded, "hex")}')
+print('                                                                                    ^^^^^^^^^^\n')
+
+# Write it to json, read it back in, write it back out
+bad_cbor_bundle.to_json_file("bad_cbor_bundle.json")
+bad_cbor_again = Bundle.from_json_file("bad_cbor_bundle.json")
+bad_cbor_again.to_json_file("bad_cbor_again.json")
+
+# Attempt to decode the bytes, which will fail with a CBOR decode value error
+try:
+    Bundle.from_bytes(bad_cbor_encoded)
+except cbor2.CBORDecodeValueError:
+    traceback.print_exc()
+
+print()
+
+# Another example, with bad CBOR encoding of an EID. CBOR encoded EIDs are an
+# array (major type 4) - in this case additional info 31 would be a valid value,
+# so we set the additional info to 30, which is an invalid value for an array.
+
+# Restore the lifetime and then change the dest_eid to be invalid
+primary_block.lifetime = orig_lifetime
+orig_dest_eid = primary_block.dest_eid
+primary_block.dest_eid = InvalidCBOR(value=orig_dest_eid, additional_info=30)
+
+# Use it to create a bundle object
+bad_cbor_bundle_2 = Bundle(
+    pri_block=copy.deepcopy(primary_block),
+)
+
+# Encode it to bytes, which contains the invalid CBOR encoding
+bad_cbor_encoded = bad_cbor_bundle_2.to_bytes()
+
+# Write it to json, read it back in, write it back out
+bad_cbor_bundle_2.to_json_file("bad_cbor_bundle_2_2.json")
+bad_cbor_again = Bundle.from_json_file("bad_cbor_bundle_2_2.json")
+bad_cbor_again.to_json_file("bad_cbor_again_2.json")
+
+# Attempt to decode the bytes, which should fail with a CBOR decode value error
+try:
+    Bundle.from_bytes(bad_cbor_encoded)
+except cbor2.CBORDecodeValueError:
+    traceback.print_exc()
+
+print()
+
+# To demonstrate the checks, attempt to create an EID with an invalid additional
+# info of 31, which as noted above is NOT invalid, so this produces a ValueError
+# on creation.
+try:
+    invalid_eid = \
+        InvalidCBOR(
+            value=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
+            additional_info=31
+        ),
+except ValueError:
+    traceback.print_exc()
+    
+print()
+
+# Lastly, for all types, the only invalid values are 28-30 or 31, so attempting
+# to set the invalid additional_info to a different number, 27 in this case,
+# also produces a ValueError on creation.
+try:
+    invalid_eid= \
+        InvalidCBOR(
+            value=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
+            additional_info=27
+        ),
+except ValueError:
+    traceback.print_exc()
+
