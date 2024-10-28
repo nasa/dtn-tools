@@ -37,25 +37,37 @@ A couple of changes in the COSMOS configuration (/home/[AUID]/cosmos/compose.yam
 
 For talking to external machines, add the following rows under the "restart" entry in the "openc3-cosmos-script-runner-api" section (below are the ports that we will use for interoperability testing - our HDTN configuration is set up to talk to them - but other ports can be used depending on context):
 
-    ports:
-      - "4556:4556/udp"
-      - "4557:4557/udp"
-      - "4558:4558/udp"
-      - "4559:4559/udp"
+        ports:
+          - "4556:4556/udp"
+          - "4557:4557/udp"
+          - "4558:4558/udp"
+          - "4559:4559/udp"
 
 For allowing the COSMOS scripts to read and write bundles to disk, add the following row as the last entry under "volumes" in the "openc3-cosmos-script-runner-api" section:
 
-      - "./bundles:/bundles"
+        - "./bundles:/bundles"
 
 You may need to stop and start COSMOS (using openc3.sh) for these changes to take effect.
 
-In the top level dtngen directory enter this command to build the DTNGen python .whl file (it is created in the dist subdirectory):
+## Building the .whl package files
+
+In the top level dtngen directory enter this command to build the DTNGen python .whl package file (it is created in the dist subdirectory):
 
         python setup.py bdist_wheel
 
 Repeat for DTNCLA.
 
-Finally, from the COSMOS Admin Console select (under Packages) the DTNGen .whl file and click on upload.  Repeat for DTNCLA.
+## Install the .whl files in COSMOS
+
+From the COSMOS Admin Console select (under Packages) the DTNGen .whl file and click on upload.  Repeat for DTNCLA.
+
+## Install the .whl files for commmand-line python usage
+
+In a terminal, cd to the dtngen dist subdirectory and enter this command (substitute with the current .whl filename):
+
+        pip install dtngen-0.6.0-py3-none-any.whl
+    
+Repeat for DTNCLA
 
 ## Running the test script
 
