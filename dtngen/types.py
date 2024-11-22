@@ -172,6 +172,47 @@ and 6.'
         return {'value': self.value, 'additional_info': self.additional_info}
         
 
+class RawData:
+    """Raw data that does not get cbor encoded."""
+
+    def __init__(self, value):
+        """Initialize the RawData.
+
+        :param bytes value: The bytes data to put in the stream
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            from dtngen.types import RawData
+            
+            # cbor int (major type 0) that, with additional info 26 (0x1a),
+            # should be in 4 bytes, but only has 3
+            wrong_length_cbor_int = RawData(b'\\x1a\\x01\\x02\\x03')
+            
+        """
+        if not isinstance(value, bytes):
+            err_msg = f"RawData value '{value}' is type {type(value)} instead of bytes."
+            raise ValueError(err_msg)
+        
+        self.value = value
+        
+        
+    def enc_data(self):
+        """Return the data to encode.
+
+        :return: the value to write to the stream
+        :rtype: bytes
+
+        *Usage:*
+
+        .. code-block:: python
+        
+            data = rawdata.enc_data()
+        """
+        return self.value
+
+
 class EID:
     """Endpoint Identifier."""
 
@@ -785,5 +826,8 @@ def default_encoder(encoder, value):
         
         # Write the modified encoding to the stream
         encoder.write(bytes(cbor_val))
+    elif class_name is 'RawData':
+        # write the value (bytes) as-is to the stream
+        encoder.write(value.enc_data())
     else:
         raise cbor2.CBOREncodeTypeError(f'cannot serialize type {type(value)}')

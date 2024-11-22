@@ -1,7 +1,7 @@
 import base64
 
 from .types import EID, CreationTimestamp, HopCountData, CTEBData, CREBData, \
-    InvalidCBOR
+    InvalidCBOR, RawData
 
 def custom_encoder(x):
     """JSON encode values in a non-default way."""
@@ -9,7 +9,6 @@ def custom_encoder(x):
         return {
             "type": "hexbytes",
             "value": x.hex()
-            #             "value": base64.b64encode(x).decode()
         }
     elif isinstance(x, EID):
         return {"type": "EID", "value": {"uri": x.uri, "ssp": x.ssp}}
@@ -44,6 +43,11 @@ def custom_encoder(x):
             "type": "InvalidCBOR",
             "value": {"value": x.value, \
                 "additional_info": x.additional_info},
+        }
+    elif isinstance(x, RawData):
+        return {
+            "type": "RawData",
+            "value": x.value.hex(),
         }
     else:
         raise TypeError(f'Object of type {type(x)} is not JSON serializable')
@@ -87,6 +91,10 @@ def custom_decoder(x):
         return InvalidCBOR(
             value = x["value"]["value"], \
                 additional_info = x["value"]["additional_info"],
+        )
+    elif x.get("type") == "RawData":
+        return RawData(
+            value = bytes.fromhex(x["value"])
         )
     else:
         return x

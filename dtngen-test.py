@@ -30,11 +30,13 @@ from dtngen.types import (
     CTEBData,
     CREBData,
     InvalidCBOR,
+    RawData,
 )
 
 import warnings
 import traceback
 import copy
+import cbor2
 
 # Display every warning - by default it only shows the first warning of the type
 # and message content, from a specific line of code. Or set it to "ignore" to
@@ -1082,6 +1084,7 @@ bad_cbor_again = Bundle.from_json_file("bad_cbor_bundle.json")
 bad_cbor_again.to_json_file("bad_cbor_again.json")
 
 # Attempt to decode the bytes, which will fail with a CBOR decode value error
+print('\nAttempt to decode the bad encoding. This should fail:\n')
 try:
     Bundle.from_bytes(bad_cbor_encoded)
 except cbor2.CBORDecodeValueError:
@@ -1112,6 +1115,7 @@ bad_cbor_again = Bundle.from_json_file("bad_cbor_bundle_2_2.json")
 bad_cbor_again.to_json_file("bad_cbor_again_2.json")
 
 # Attempt to decode the bytes, which should fail with a CBOR decode value error
+print('\nAttempt to decode the bad encoding. This should fail:\n')
 try:
     Bundle.from_bytes(bad_cbor_encoded)
 except cbor2.CBORDecodeValueError:
@@ -1145,3 +1149,31 @@ try:
 except ValueError:
     traceback.print_exc()
 
+another_bad_bundle = copy.deepcopy(good_cbor_bundle)
+
+# replace the lifetime (3600000 = 0x0036ee80), which in cbor is encoded as major
+# type 0, additional info 26 (0x1a) and then 4 bytes for the value, with the
+# same encoding, but missing the last byte
+another_bad_bundle.pri_block.lifetime=RawData(b'\x1a\x00\x36\xee')
+
+# Testing encoding as json and from json
+another_bad_json = another_bad_bundle.to_json()
+another_bad_from_json = Bundle.from_json(another_bad_json)
+another_bad_json_from_json = another_bad_from_json.to_json()
+assert (another_bad_json == another_bad_json_from_json)
+
+# Encode as bytes and print comparison to the good bundle
+another_bad_encoded = another_bad_bundle.to_bytes()
+
+print(f'\ngood_cbor = {codecs.encode(good_cbor_encoded, "hex")}')
+print(f' bad_cbor = {codecs.encode(another_bad_encoded, "hex")}')
+print('                                                                                    ^^^^^^^^^^')
+
+# Try to decode the bundle. It should fail with a premature end-of-stream error.
+print('Attempt to decode the bad encoding. This should fail:\n')
+try:
+    another_bad_decoded = Bundle.from_bytes(another_bad_encoded)
+except cbor2.CBORDecodeEOF:
+    traceback.print_exc()
+    
+print('\nDone')

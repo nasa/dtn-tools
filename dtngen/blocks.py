@@ -73,8 +73,6 @@ class CanonicalBlock(Block):
             warnings.warn(warnmsg, TypeWarning)
         self.crc = crc
 
-        # CRC
-
     @classmethod
     def decode_common(cls, cand_block):
         """Decode the fields common to all canonical blocks.
@@ -142,7 +140,9 @@ class CanonicalBlock(Block):
                     type_spec_data,
                 ]
             cfields = [i for i in tmp if i is not None]
-            self.crc = calc_crc(self.crc_type, cfields)
+            crc = calc_crc(self.crc_type, cfields)
+        else:
+            crc = self.crc
         
         tmp = \
             [
@@ -151,7 +151,7 @@ class CanonicalBlock(Block):
                     self.control_flags,
                     self.crc_type,
                     type_spec_data,
-                    self.crc,
+                    crc,
             ]
         cfields = [i for i in tmp if i is not None]
 
@@ -189,7 +189,9 @@ class CanonicalBlock(Block):
                     enc_type_spec_data,
                 ]
             cfields = [i for i in tmp if i is not None]
-            self.crc = calc_crc(self.crc_type, cfields)
+            crc = calc_crc(self.crc_type, cfields)
+        else:
+            crc = self.crc
         
         tmp = \
             [
@@ -199,7 +201,7 @@ class CanonicalBlock(Block):
                 self.control_flags,
                 self.crc_type,
                 type_spec_data,
-                self.crc,
+                crc,
             ]
         cfields = [i for i in tmp if i is not None]
         keys = ["_block_class", "blk_type", "blk_num", "control_flags", "crc_type", type_spec_key, "crc"]
@@ -919,7 +921,9 @@ class PayloadBlock(CanonicalBlock):
                     type_spec_data,
                 ]
             cfields = [i for i in tmp if i is not None]
-            self.crc = calc_crc(self.crc_type, cfields)
+            crc = calc_crc(self.crc_type, cfields)
+        else:
+            crc = self.crc
         
         tmp = \
             [
@@ -928,7 +932,7 @@ class PayloadBlock(CanonicalBlock):
                     self.control_flags,
                     self.crc_type,
                     type_spec_data,
-                    self.crc,
+                    crc,
             ]
         cfields = [i for i in tmp if i is not None]
 
@@ -960,7 +964,9 @@ class PayloadBlock(CanonicalBlock):
                     type_spec_data,
                 ]
             cfields = [i for i in tmp if i is not None]
-            self.crc = calc_crc(self.crc_type, cfields)
+            crc = calc_crc(self.crc_type, cfields)
+        else:
+            crc = self.crc
             
         tmp = \
             [
@@ -970,7 +976,7 @@ class PayloadBlock(CanonicalBlock):
                 self.control_flags,
                 self.crc_type,
                 type_spec_data,
-                self.crc,
+                crc,
             ]
         cfields = [i for i in tmp if i is not None]
         keys = ["_block_class", "blk_type", "blk_num", "control_flags", "crc_type", "payload", "crc"]
@@ -1202,7 +1208,9 @@ creation time at which the bundle's payload will no longer be useful
                     self.lifetime,
                 ]
             fields = [i for i in tmp if i is not None]
-            self.crc = calc_crc(self.crc_type, fields)
+            crc = calc_crc(self.crc_type, fields)
+        else:
+            crc = self.crc
         
         tmp = \
             [
@@ -1214,7 +1222,7 @@ creation time at which the bundle's payload will no longer be useful
                 self.rpt_eid,
                 self.creation_timestamp,
                 self.lifetime,
-                self.crc,
+                crc,
             ]
         fields = [i for i in tmp if i is not None]
 
@@ -1247,7 +1255,9 @@ creation time at which the bundle's payload will no longer be useful
                     self.lifetime,
                 ]
             fields = [i for i in tmp if i is not None]
-            self.crc = calc_crc(self.crc_type, fields)
+            crc = calc_crc(self.crc_type, fields)
+        else:
+            crc = self.crc
         
         tmp = \
             [
@@ -1260,7 +1270,7 @@ creation time at which the bundle's payload will no longer be useful
                 self.rpt_eid,
                 self.creation_timestamp,
                 self.lifetime,
-                self.crc,
+                crc,
             ]
         fields = [i for i in tmp if i is not None]
         keys = ["_block_class", "version", "control_flags", "crc_type", "dest_eid", "src_eid", "rpt_eid", "creation_timestamp", "lifetime", "crc"]

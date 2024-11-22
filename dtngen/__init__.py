@@ -30,6 +30,7 @@ from .types import (
     CTEBData,
     CREBData,
     InvalidCBOR,
+    RawData,
     calc_crc,
 )
 
@@ -51,6 +52,7 @@ __all__ = [
     "CTEBData",
     "CREBData",
     "InvalidCBOR",
+    "RawData",
     "calc_crc",
     # Blocks
     "Block",
