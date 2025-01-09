@@ -1,15 +1,17 @@
+import warnings
 from enum import IntEnum, IntFlag
+from itertools import zip_longest
 
 import cbor2
 from crccheck.crc import Crc16IbmSdlc, Crc32Iscsi
-from itertools import zip_longest
-import codecs
 
-import warnings
 
 class TypeWarning(Warning):
+    """Warning for an incorrect data type detected."""
+
     pass
-    
+
+
 class AdminRecordType:
     """Administrative Record Types."""
 
@@ -87,7 +89,7 @@ class CRCFlag(IntEnum):
 
 
 def calc_crc(crc_type, fields):
-    """Calculate CRC given crc type and fields. The fields will be cbor encoded.
+    r"""Calculate CRC given crc type and fields. The fields will be cbor encoded.
 
     :param CRCType crc_type: The CRC algorithm to use. Valid values are CRCType.CRC16_X25 and CRCType.CRC32_C
     :param list fields: The list of block fields to calculate the CRC on
@@ -98,9 +100,9 @@ def calc_crc(crc_type, fields):
     *Usage:*
 
     .. code-block:: python
-    
+
         from dtngen.types import CRCType, calc_crc
-        
+
         crc = calc_crc(crc_type = CRCType.CRC16_X25, fields = [1, 2, b'\\x03\\x04'])
     """
     if crc_type == CRCType.CRC16_X25:
@@ -114,11 +116,12 @@ def calc_crc(crc_type, fields):
     else:
         return None
 
+
 class InvalidCBOR:
     """Invalid CBOR Encoding."""
 
     def __init__(self, value, additional_info):
-        """Initialize the InvalidCBOR.
+        r"""Initialize the InvalidCBOR.
 
         :param any value: The CBOR-encodable value
         :param int additional_info: The invalid additional info value to set. Must be 28-30 or 31. 31 is only invalid for major types 0, 1 and 6.
@@ -126,37 +129,32 @@ class InvalidCBOR:
         *Usage:*
 
         .. code-block:: python
-        
+
             from dtngen.types import InvalidCBOR
-            
+
             invalid_cbor_eid = \\
                 InvalidCBOR(
                     value=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
                     additional_info=28
                 )
-                
+
             invalid_cbor_uint = InvalidCBOR(value=360000, additional_info=31)
 
         """
-        if not additional_info in [28, 29, 30, 31]:
-            err_msg = f'Attempting to create invalid CBOR encoding, but the \
-specified additional info value {additional_info} is NOT invalid. Only values \
-28-31 are invalid.'
+        if additional_info not in [28, 29, 30, 31]:
+            err_msg = f"Attempting to create invalid CBOR encoding, but the specified additional info value {additional_info} is NOT invalid. Only values 28-31 are invalid."
             raise ValueError(err_msg)
-        
+
         self.value = value
         self.additional_info = additional_info
-        
+
         cbor_val = cbor2.dumps(self.value, default=default_encoder)
         major_type = (cbor_val[0] & 0b11100000) >> 5
-        
-        if additional_info == 31 and not major_type in [0, 1, 6]:
-            err_msg = f'Attempting to create invalid CBOR encoding for \
-a value of major type {major_type}, but the specified \
-additional info value 31 is only invalid for major types 0, 1 \
-and 6.'
+
+        if additional_info == 31 and major_type not in [0, 1, 6]:
+            err_msg = f"Attempting to create invalid CBOR encoding for a value of major type {major_type}, but the specified additional info value 31 is only invalid for major types 0, 1 and 6."
             raise ValueError(err_msg)
-        
+
     def enc_data(self):
         """Return the data to encode.
 
@@ -166,38 +164,37 @@ and 6.'
         *Usage:*
 
         .. code-block:: python
-        
+
             data = myinvalidcbor.enc_data()
         """
-        return {'value': self.value, 'additional_info': self.additional_info}
-        
+        return {"value": self.value, "additional_info": self.additional_info}
+
 
 class RawData:
     """Raw data that does not get cbor encoded."""
 
     def __init__(self, value):
-        """Initialize the RawData.
+        r"""Initialize the RawData.
 
         :param bytes value: The bytes data to put in the stream
 
         *Usage:*
 
         .. code-block:: python
-        
+
             from dtngen.types import RawData
-            
+
             # cbor int (major type 0) that, with additional info 26 (0x1a),
             # should be in 4 bytes, but only has 3
             wrong_length_cbor_int = RawData(b'\\x1a\\x01\\x02\\x03')
-            
+
         """
         if not isinstance(value, bytes):
             err_msg = f"RawData value '{value}' is type {type(value)} instead of bytes."
             raise ValueError(err_msg)
-        
+
         self.value = value
-        
-        
+
     def enc_data(self):
         """Return the data to encode.
 
@@ -207,7 +204,7 @@ class RawData:
         *Usage:*
 
         .. code-block:: python
-        
+
             data = rawdata.enc_data()
         """
         return self.value
@@ -224,11 +221,11 @@ class EID:
         *Usage:*
 
         URI type 1 (dtn URI scheme):
-        
+
         .. code-block:: python
-        
+
             from dtngen.types import EID
-            
+
             myeid = EID(
                 {
                     uri: 1,
@@ -237,9 +234,9 @@ class EID:
             )
 
         URI type 2 (ipn URI scheme):
-        
+
         .. code-block:: python
-        
+
             myeid = EID(
                 {
                     uri: 2,
@@ -253,23 +250,32 @@ class EID:
         if "uri" in eid_fields:
             self.uri = eid_fields["uri"]
             if (not isinstance(self.uri, int)) or self.uri < 1 or self.uri > 2:
-                warnmsg = f'Unsupported EID URI type {self.uri}'
+                warnmsg = f"Unsupported EID URI type {self.uri}"
                 warnings.warn(warnmsg)
         if "ssp" in eid_fields:
             self.ssp = eid_fields["ssp"]
-            if isinstance(self.uri, int) and self.uri == 1 and not isinstance(self.ssp, str):
-                warnmsg = f'DTN EID ssp is {self.ssp} instead of a string'
+            if (
+                isinstance(self.uri, int)
+                and self.uri == 1
+                and not isinstance(self.ssp, str)
+            ):
+                warnmsg = f"DTN EID ssp is {self.ssp} instead of a string"
                 warnings.warn(warnmsg, TypeWarning)
-            if isinstance(self.uri, int) and self.uri == 2 \
-                    and (not isinstance(self.ssp, dict) \
-                        or len(self.ssp) != 2 \
-                        or 'node_num' not in self.ssp \
-                        or 'service_num' not in self.ssp \
-                        or not isinstance(self.ssp['node_num'], int) \
-                        or not isinstance(self.ssp['service_num'], int)):
-                warnmsg = f'IPN EID ssp is {self.ssp} instead of a dict with \'node_num\' and \'service_num\' elements that are ints'
+            if (
+                isinstance(self.uri, int)
+                and self.uri == 2
+                and (
+                    not isinstance(self.ssp, dict)
+                    or len(self.ssp) != 2
+                    or "node_num" not in self.ssp
+                    or "service_num" not in self.ssp
+                    or not isinstance(self.ssp["node_num"], int)
+                    or not isinstance(self.ssp["service_num"], int)
+                )
+            ):
+                warnmsg = f"IPN EID ssp is {self.ssp} instead of a dict with 'node_num' and 'service_num' elements that are ints"
                 warnings.warn(warnmsg, TypeWarning)
-                
+
     def enc_data(self):
         """Return the data to encode.
 
@@ -279,23 +285,23 @@ class EID:
         *Usage:*
 
         .. code-block:: python
-        
+
             data = myeid.enc_data()
         """
         if (not isinstance(self.uri, int)) or self.uri <= 1 or self.uri > 2:
             # If it is DTN type or is an invalid type, pass through the data
             # as is
             return [i for i in [self.uri, self.ssp] if i is not None]
-        
+
         # It is ipn type
         node_num = None
         service_num = None
-        
+
         if "node_num" in self.ssp:
             node_num = self.ssp["node_num"]
         if "service_num" in self.ssp:
             service_num = self.ssp["service_num"]
-            
+
         ssp_data = [i for i in [node_num, service_num] if i is not None]
         return [j for j in [self.uri, ssp_data] if j is not None]
 
@@ -310,28 +316,31 @@ class EID:
         *Usage:*
 
         .. code-block:: python
-        
+
             from dtngen.types import EID
-            
+
             eid_elements = [2, [200, 1]]
             myeid = EID.decode(eid_elements)
         """
-        if isinstance(cand_eid, list) and len(cand_eid) >= 1 \
-                and (cand_eid[0] < 1 or cand_eid[0] > 2):
+        if (
+            isinstance(cand_eid, list)
+            and len(cand_eid) >= 1
+            and (cand_eid[0] < 1 or cand_eid[0] > 2)
+        ):
             # Because lookslike() should be called first, we should never get
             # here. If we do it's a programatic error.
-            raise ValueError(f'Unsupported EID URI Type {cand_eid[0]}')
+            raise ValueError(f"Unsupported EID URI Type {cand_eid[0]}")
 
         uri_data = None
         ssp_data = None
-        
+
         if len(cand_eid) >= 1:
             uri_data = cand_eid[0]
             if len(cand_eid) == 2:
                 if cand_eid[0] == 1:
                     ssp_data = cand_eid[1]
                 else:
-                    ssp_dict = {"node_num":None, "service_num":None}
+                    ssp_dict = {"node_num": None, "service_num": None}
                     ssp_data = dict(zip_longest(ssp_dict, cand_eid[1]))
 
         eid_d = {
@@ -339,7 +348,7 @@ class EID:
             "ssp": ssp_data,
         }
         return EID(eid_d)
-        
+
     @classmethod
     def lookslike(cls, cand_eid):
         """Check if candidate EID looks like an EID.
@@ -351,22 +360,28 @@ class EID:
         *Usage:*
 
         .. code-block:: python
-        
+
             from dtngen.types import EID
-        
+
             if EID.lookslike(list_of_candidate_fields):
                 print ("It looks like an EID")
         """
-        if isinstance(cand_eid, list) and len(cand_eid) == 2 \
-                and isinstance(cand_eid[0], int):
+        if (
+            isinstance(cand_eid, list)
+            and len(cand_eid) == 2
+            and isinstance(cand_eid[0], int)
+        ):
             is_dtn = cand_eid[0] == 1 and isinstance(cand_eid[1], str)
-            is_ipn = cand_eid[0] == 2 \
-                and isinstance(cand_eid[1], list) and len(cand_eid[1]) == 2 \
-                and isinstance(cand_eid[1][0], int) \
+            is_ipn = (
+                cand_eid[0] == 2
+                and isinstance(cand_eid[1], list)
+                and len(cand_eid[1]) == 2
+                and isinstance(cand_eid[1][0], int)
                 and isinstance(cand_eid[1][1], int)
-            
-            return (is_dtn or is_ipn)
-        
+            )
+
+            return is_dtn or is_ipn
+
         return False
 
 
@@ -381,9 +396,9 @@ class CreationTimestamp:
         *Usage:*
 
         .. code-block:: python
-        
+
             from dtngen.types import CreationTimestamp
-            
+
             mytimestamp = CreationTimestamp({"time": 755533838904, "sequence": 0})
         """
         self.time = None
@@ -393,7 +408,7 @@ class CreationTimestamp:
             self.time = timestamp_fields["time"]
         if "sequence" in timestamp_fields:
             self.sequence = timestamp_fields["sequence"]
-                
+
     def enc_data(self):
         """Return the data to encode.
 
@@ -403,7 +418,7 @@ class CreationTimestamp:
         *Usage:*
 
         .. code-block:: python
-        
+
             data = mytimestamp.enc_data()
         """
         data = [self.time, self.sequence]
@@ -420,23 +435,25 @@ class CreationTimestamp:
         *Usage:*
 
         .. code-block:: python
-        
+
             from dtngen.types import CreationTimestamp
-            
-            
+
+
             cts_elements = [755533838904, 0]
             mytimestamp = CreationTimestamp.decode(cts_elements)
         """
         if len(cand_timestamp) != 2:
             # Because lookslike() should be called first, we should never get
             # here. If we do it's a programatic error.
-            raise ValueError(f'Creation Timestamp has {len(cand_timestamp)} elements but should have 2.')
-            
-        type_spec_dict = {"time":None, "sequence":None}
+            raise ValueError(
+                f"Creation Timestamp has {len(cand_timestamp)} elements but should have 2."
+            )
+
+        type_spec_dict = {"time": None, "sequence": None}
         timestamp_d = dict(zip_longest(type_spec_dict, cand_timestamp))
-        
+
         return CreationTimestamp(timestamp_d)
-        
+
     @classmethod
     def lookslike(cls, cand_eid):
         """Check if candidate creation timestamp looks like an creation timestamp.
@@ -448,14 +465,18 @@ class CreationTimestamp:
         *Usage:*
 
         .. code-block:: python
-        
+
             from dtngen.types import CreationTimestamp
-        
+
             if CreationTimestamp.lookslike(list_of_candidate_fields):
                 print ("It looks like a CreationTimestamp")
         """
-        return isinstance(cand_eid, list) and len(cand_eid) == 2 \
-            and isinstance(cand_eid[0], int) and isinstance(cand_eid[1], int)
+        return (
+            isinstance(cand_eid, list)
+            and len(cand_eid) == 2
+            and isinstance(cand_eid[0], int)
+            and isinstance(cand_eid[1], int)
+        )
 
 
 class HopCountData:
@@ -469,9 +490,9 @@ class HopCountData:
         *Usage:*
 
         .. code-block:: python
-        
+
             from dtngen.types import HopCountData
-            
+
             myhopdata = HopCountData({"hop_limit": 15, "hop_count": 3})
         """
         self.hop_limit = None
@@ -481,7 +502,7 @@ class HopCountData:
             self.hop_limit = hopcount_fields["hop_limit"]
         if "hop_count" in hopcount_fields:
             self.hop_count = hopcount_fields["hop_count"]
-                
+
     def enc_data(self):
         """Return the data to encode.
 
@@ -491,7 +512,7 @@ class HopCountData:
         *Usage:*
 
         .. code-block:: python
-        
+
             data = myhopdata.enc_data()
         """
         data = [self.hop_limit, self.hop_count]
@@ -508,22 +529,24 @@ class HopCountData:
         *Usage:*
 
         .. code-block:: python
-        
+
             from dtngen.types import HopCountData
-            
+
             hc_elements = [15, 3]
             myhopdata = HopCountData.decode(hc_elements)
         """
         if len(cand_hopcount_data) != 2:
             # Because lookslike() should be called first, we should never get
             # here. If we do it's a programatic error.
-            raise ValueError(f'Hop Count Data has {len(cand_hopcount_data)} elements but should have 2.')
-            
-        type_spec_dict = {"hop_limit":None, "hop_count":None}
+            raise ValueError(
+                f"Hop Count Data has {len(cand_hopcount_data)} elements but should have 2."
+            )
+
+        type_spec_dict = {"hop_limit": None, "hop_count": None}
         hopcount_data = dict(zip_longest(type_spec_dict, cand_hopcount_data))
 
         return HopCountData(hopcount_data)
-        
+
     @classmethod
     def lookslike(cls, cand_hopcount_data):
         """Check if candidate hop count data looks like Hop Count data.
@@ -535,9 +558,9 @@ class HopCountData:
         *Usage:*
 
         .. code-block:: python
-        
+
             from dtngen.types import HopCountData
-        
+
             if HopCountData.lookslike(list_of_candidate_fields):
                 print ("It looks like HopCountData")
         """
@@ -546,8 +569,9 @@ class HopCountData:
         if not len(cand_hopcount_data) == 2:
             return False
 
-        return isinstance(cand_hopcount_data[0], int) and \
-            isinstance(cand_hopcount_data[1], int)
+        return isinstance(cand_hopcount_data[0], int) and isinstance(
+            cand_hopcount_data[1], int
+        )
 
 
 class CTEBData:
@@ -561,9 +585,9 @@ class CTEBData:
         *Usage:*
 
         .. code-block:: python
-        
+
             from dtngen.types import CTEBData, EID
-            
+
             myctebdata = CTEBData(
                 {
                     "trans_id": 10,
@@ -574,14 +598,14 @@ class CTEBData:
         self.trans_id = None
         self.trans_series_id = None
         self.req_orig_eid = None
-        
+
         if "trans_id" in cteb_fields:
             self.trans_id = cteb_fields["trans_id"]
         if "trans_series_id" in cteb_fields:
             self.trans_series_id = cteb_fields["trans_series_id"]
         if "req_orig_eid" in cteb_fields:
             self.req_orig_eid = cteb_fields["req_orig_eid"]
-                
+
     def enc_data(self):
         """Return the data to encode.
 
@@ -591,7 +615,7 @@ class CTEBData:
         *Usage:*
 
         .. code-block:: python
-        
+
             data = myctebdata.enc_data()
         """
         data = [self.trans_id, self.trans_series_id, self.req_orig_eid]
@@ -608,26 +632,31 @@ class CTEBData:
         *Usage:*
 
         .. code-block:: python
-        
+
             from dtngen.types import CTEBData
-            
+
             ctebd_elements = [10, 2, [2, [303, 1]]]
             myctebdata = CTEBData.decode(ctebd_elements)
         """
         if len(cand_cteb_data) != 3:
             # Because lookslike() should be called first, we should never get
             # here. If we do it's a programatic error.
-            raise ValueError(f'CTEB Data has {len(cand_cteb_data)} elements but should have 3.')
-            
-        type_spec_dict = {"trans_id":None, "trans_series_id":None, \
-            "req_orig_eid":None}
+            raise ValueError(
+                f"CTEB Data has {len(cand_cteb_data)} elements but should have 3."
+            )
+
+        type_spec_dict = {
+            "trans_id": None,
+            "trans_series_id": None,
+            "req_orig_eid": None,
+        }
         cteb_data = dict(zip_longest(type_spec_dict, cand_cteb_data))
 
         if "req_orig_eid" in cteb_data and cteb_data["req_orig_eid"] is not None:
             cteb_data["req_orig_eid"] = EID.decode(cteb_data["req_orig_eid"])
 
         return CTEBData(cteb_data)
-        
+
     @classmethod
     def lookslike(cls, cand_cteb_data):
         """Check if candidate hop count data looks like Hop Count data.
@@ -639,9 +668,9 @@ class CTEBData:
         *Usage:*
 
         .. code-block:: python
-        
+
             from dtngen.types import CTEBData
-        
+
             if CTEBData.lookslike(list_of_candidate_fields):
                 print ("It looks like CTEBData")
         """
@@ -649,10 +678,12 @@ class CTEBData:
             return False
         if not len(cand_cteb_data) == 3:
             return False
-            
-        return isinstance(cand_cteb_data[0], int) and \
-            isinstance(cand_cteb_data[1], int) \
+
+        return (
+            isinstance(cand_cteb_data[0], int)
+            and isinstance(cand_cteb_data[1], int)
             and EID.lookslike(cand_cteb_data[2])
+        )
 
 
 class CREBData:
@@ -664,15 +695,15 @@ class CREBData:
         :param dict creb_fields: CREB Data Fields
 
         *Usage:*
-        
+
         CREBData contains 1 to 5 elements. In a valid case, if an element is provided, all prior elements must also be provided.
-        
+
         All elements provided:
 
         .. code-block:: python
-        
+
             from dtngen.types import CTEBData, EID
-            
+
             myrtebdata = CREBData
             (
                 {
@@ -683,11 +714,11 @@ class CREBData:
                     "rpt_eid": EID({"uri": 2, "ssp": {"node_num": 305, "service_num": 2}})
                 }
             )
-        
+
         Only the first two elements provided:
 
         .. code-block:: python
-        
+
             myrtebdata = CREBData
             (
                 {
@@ -713,13 +744,41 @@ class CREBData:
         if "rpt_eid" in creb_fields:
             self.rpt_eid = creb_fields["rpt_eid"]
 
-        if (self.bundle_seq_id is not None and self.bundle_seq_num is None) \
-            or (self.rpt_request_flags is not None and any(arg is None for arg in (self.bundle_seq_num, self.bundle_seq_id))) \
-            or (self.scope_node_id is not None and any(arg is None for arg in (self.bundle_seq_num, self.bundle_seq_id, self.rpt_request_flags))) \
-            or (self.rpt_eid is not None and any(arg is None for arg in (self.bundle_seq_num, self.bundle_seq_id, self.rpt_request_flags, self.scope_node_id))):
-                warnmsg = "Compressed Reporting Extension Block: One or more of bundle_seq_id, rpt_request_flags, scope_node_id or rpt_eid was provided without one or more of the prior arguments provided"
-                warnings.warn(warnmsg)
-                
+        if (
+            (self.bundle_seq_id is not None and self.bundle_seq_num is None)
+            or (
+                self.rpt_request_flags is not None
+                and any(
+                    arg is None for arg in (self.bundle_seq_num, self.bundle_seq_id)
+                )
+            )
+            or (
+                self.scope_node_id is not None
+                and any(
+                    arg is None
+                    for arg in (
+                        self.bundle_seq_num,
+                        self.bundle_seq_id,
+                        self.rpt_request_flags,
+                    )
+                )
+            )
+            or (
+                self.rpt_eid is not None
+                and any(
+                    arg is None
+                    for arg in (
+                        self.bundle_seq_num,
+                        self.bundle_seq_id,
+                        self.rpt_request_flags,
+                        self.scope_node_id,
+                    )
+                )
+            )
+        ):
+            warnmsg = "Compressed Reporting Extension Block: One or more of bundle_seq_id, rpt_request_flags, scope_node_id or rpt_eid was provided without one or more of the prior arguments provided"
+            warnings.warn(warnmsg)
+
     def enc_data(self):
         """Return the data to encode.
 
@@ -729,13 +788,17 @@ class CREBData:
         *Usage:*
 
         .. code-block:: python
-        
+
             data = mycrebdata.enc_data()
         """
-        data = [self.bundle_seq_num, self.bundle_seq_id, \
-            self.rpt_request_flags, self.scope_node_id, self.rpt_eid]
+        data = [
+            self.bundle_seq_num,
+            self.bundle_seq_id,
+            self.rpt_request_flags,
+            self.scope_node_id,
+            self.rpt_eid,
+        ]
         return [i for i in data if i is not None]
-        
 
     @classmethod
     def decode(cls, cand_creb_data):
@@ -748,19 +811,26 @@ class CREBData:
         *Usage:*
 
         .. code-block:: python
-        
+
             from dtngen.types import CREBData
-            
+
             crebd_elements = [1, 4, 0, [2, [303, 1]], [2, [305, 2]]]
             mycrebdata = CREBData.decode(crebd_elements)
         """
         if len(cand_creb_data) < 1 or len(cand_creb_data) > 5:
             # Because lookslike() should be called first, we should never get
             # here. If we do it's a programatic error.
-            raise ValueError(f'CREB Data has {len(cand_creb_data)} elements but should have 1 to 5.')
-            
-        type_spec_dict = {"bundle_seq_num":None, "bundle_seq_id":None, \
-            "rpt_request_flags":None, "scope_node_id":None, "rpt_eid":None}
+            raise ValueError(
+                f"CREB Data has {len(cand_creb_data)} elements but should have 1 to 5."
+            )
+
+        type_spec_dict = {
+            "bundle_seq_num": None,
+            "bundle_seq_id": None,
+            "rpt_request_flags": None,
+            "scope_node_id": None,
+            "rpt_eid": None,
+        }
         creb_data = dict(zip_longest(type_spec_dict, cand_creb_data))
 
         if "scope_node_id" in creb_data and creb_data["scope_node_id"] is not None:
@@ -769,7 +839,7 @@ class CREBData:
             creb_data["rpt_eid"] = EID.decode(creb_data["rpt_eid"])
 
         return CREBData(creb_data)
-        
+
     @classmethod
     def lookslike(cls, cand_creb_data):
         """Check if candidate hop count data looks like Hop Count data.
@@ -781,16 +851,16 @@ class CREBData:
         *Usage:*
 
         .. code-block:: python
-        
+
             from dtngen.types import CREBData
-        
+
             if CREBData.lookslike(list_of_candidate_fields):
                 print ("It looks like CREBData")
         """
         if not isinstance(cand_creb_data, list):
             return False
 
-        clen = len(cand_creb_data)        
+        clen = len(cand_creb_data)
         if not (clen >= 1 and clen <= 5):
             return False
         if not isinstance(cand_creb_data[0], int):
@@ -807,27 +877,27 @@ class CREBData:
 
 
 def default_encoder(encoder, value):
-    """cbor2 custom field encoder. Encodes a value of one of the defined dtngen.types data types as cbor
-    """
-    class_list = \
-        ['EID', 'CreationTimestamp', 'HopCountData', 'CTEBData', 'CREBData']
+    """cbor2 custom field encoder. Encodes a value of one of the defined dtngen.types data types as cbor."""
+    class_list = ["EID", "CreationTimestamp", "HopCountData", "CTEBData", "CREBData"]
     class_name = type(value).__name__
-    
+
     if class_name in class_list:
         encoder.encode(value.enc_data())
-    elif class_name is 'InvalidCBOR':
+    elif class_name == "InvalidCBOR":
         # Encode the value as normal
-        cbor_val = bytearray(cbor2.dumps(value.enc_data()["value"], default=default_encoder))
+        cbor_val = bytearray(
+            cbor2.dumps(value.enc_data()["value"], default=default_encoder)
+        )
 
         # Replace the additional info of the first byte with the invalid
         # additional info
         cbor_val[0] &= 0b11100000
         cbor_val[0] |= value.enc_data()["additional_info"]
-        
+
         # Write the modified encoding to the stream
         encoder.write(bytes(cbor_val))
-    elif class_name is 'RawData':
+    elif class_name == "RawData":
         # write the value (bytes) as-is to the stream
         encoder.write(value.enc_data())
     else:
-        raise cbor2.CBOREncodeTypeError(f'cannot serialize type {type(value)}')
+        raise cbor2.CBOREncodeTypeError(f"cannot serialize type {type(value)}")

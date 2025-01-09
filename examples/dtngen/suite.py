@@ -1,42 +1,40 @@
 import codecs
+import copy
+import traceback
+import warnings
 
-from dtngen.blocks import (
-    CanonicalBlock,
-    PrevNodeBlock,
+import cbor2
+
+from dtntools.dtngen.blocks import (
     BundleAgeBlock,
-    HopCountBlock,
-    CustodyTransferBlock,
+    CanonicalBlock,
     CompressedReportingBlock,
+    CustodyTransferBlock,
+    HopCountBlock,
     PayloadBlock,
     PayloadBlockSettings,
+    PrevNodeBlock,
     PrimaryBlock,
     PrimaryBlockSettings,
     UnknownBlock,
 )
-
-from dtngen.bundle import Bundle
-
-from dtngen.types import (
-    TypeWarning,
+from dtntools.dtngen.bundle import Bundle
+from dtntools.dtngen.types import (
+    EID,
     BlockPCFlags,
     BlockType,
     BundlePCFlags,
-    StatusRRFlags,
     CRCFlag,
     CRCType,
-    EID,
     CreationTimestamp,
-    HopCountData,
-    CTEBData,
     CREBData,
+    CTEBData,
+    HopCountData,
     InvalidCBOR,
     RawData,
+    StatusRRFlags,
+    TypeWarning,
 )
-
-import warnings
-import traceback
-import copy
-import cbor2
 
 # Display every warning - by default it only shows the first warning of the type
 # and message content, from a specific line of code. Or set it to "ignore" to
@@ -91,8 +89,8 @@ assert bundle.canon_blocks[0].elements[2] == 0
 assert bundle.canon_blocks[0].elements[3] == 1
 # The type-specific data is unknown but is doubly cbor encoded so appears as a
 # cbor encoded array
-assert bundle.canon_blocks[0].elements[4] == b'\x82\x02\x82\x18\x64\x0a'
-assert bundle.canon_blocks[0].elements[5] == b'\x67\x47'
+assert bundle.canon_blocks[0].elements[4] == b"\x82\x02\x82\x18\x64\x0a"
+assert bundle.canon_blocks[0].elements[5] == b"\x67\x47"
 
 # Parsing the payload
 bplib_payload_str = bundle.canon_blocks[1].payload[8:].decode().strip()
@@ -158,9 +156,11 @@ cte_block = CustodyTransferBlock(
     control_flags=BlockPCFlags.REP_UNPROC,
     crc_type=CRCType.CRC16_X25,
     cteb_data=CTEBData(
-        {"trans_id": 10,
-        "trans_series_id": 2,
-        "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}})}
+        {
+            "trans_id": 10,
+            "trans_series_id": 2,
+            "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
+        }
     ),
     crc=CRCFlag.CALCULATE,
 )
@@ -171,11 +171,15 @@ cre_block = CompressedReportingBlock(
     control_flags=0,
     crc_type=CRCType.CRC16_X25,
     creb_data=CREBData(
-        {"bundle_seq_num": 1,
-        "bundle_seq_id": 4,
-        "rpt_request_flags": 0,
-        "scope_node_id": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
-        "rpt_eid": EID({"uri": 2, "ssp": {"node_num": 305, "service_num": 2}})}
+        {
+            "bundle_seq_num": 1,
+            "bundle_seq_id": 4,
+            "rpt_request_flags": 0,
+            "scope_node_id": EID(
+                {"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}
+            ),
+            "rpt_eid": EID({"uri": 2, "ssp": {"node_num": 305, "service_num": 2}}),
+        }
     ),
     crc=CRCFlag.CALCULATE,
 )
@@ -192,8 +196,14 @@ payload_block = PayloadBlock(
 # Use them to create a bundle object
 bundle = Bundle(
     pri_block=primary_block,
-    canon_blocks=[prev_node_block, bundle_age_block, hop_count_block,
-        cte_block, cre_block, payload_block],
+    canon_blocks=[
+        prev_node_block,
+        bundle_age_block,
+        hop_count_block,
+        cte_block,
+        cre_block,
+        payload_block,
+    ],
 )
 
 
@@ -353,8 +363,8 @@ read_bundle.to_json_file(filename2)
 # Step 12: Define new primary and canonical blocks with missing elements
 primary_block = PrimaryBlock(
     version=7,
-#     control_flags=BundlePCFlags.MUST_NOT_FRAGMENT,
-#     crc_type=CRCType.CRC16_X25,
+    #     control_flags=BundlePCFlags.MUST_NOT_FRAGMENT,
+    #     crc_type=CRCType.CRC16_X25,
     dest_eid=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
     src_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
     rpt_eid=EID({"uri": 2, "ssp": {"node_num": 300, "service_num": 1}}),
@@ -367,26 +377,26 @@ prev_node_block = PrevNodeBlock(
     blk_type=BlockType.AUTO,
     blk_num=6,
     control_flags=0,
-#     crc_type=CRCType.CRC16_X25,
-#     prev_eid=EID({"uri": 2, "ssp": {"node_num": 300, "service_num": 2}}),
+    #     crc_type=CRCType.CRC16_X25,
+    #     prev_eid=EID({"uri": 2, "ssp": {"node_num": 300, "service_num": 2}}),
     crc=CRCFlag.CALCULATE,
 )
 
 bundle_age_block = BundleAgeBlock(
     blk_type=BlockType.AUTO,
     blk_num=2,
-#     control_flags=BlockPCFlags.FRAG_REPLICATE | BlockPCFlags.DEL_UNPROC,
+    #     control_flags=BlockPCFlags.FRAG_REPLICATE | BlockPCFlags.DEL_UNPROC,
     crc_type=CRCType.CRC16_X25,
     bundle_age=108000,
     crc=CRCFlag.CALCULATE,
 )
 
 hop_count_block = HopCountBlock(
-#     blk_type=BlockType.AUTO,
+    #     blk_type=BlockType.AUTO,
     blk_num=3,
     control_flags=BlockPCFlags.FRAG_REPLICATE,
     crc_type=CRCType.CRC16_X25,
-#     hop_data=HopCountData({"hop_limit": 15, "hop_count": 3}),
+    #     hop_data=HopCountData({"hop_limit": 15, "hop_count": 3}),
     hop_data=HopCountData({"hop_count": 3}),
     crc=CRCFlag.CALCULATE,
 )
@@ -397,9 +407,11 @@ cte_block = CustodyTransferBlock(
     control_flags=BlockPCFlags.REP_UNPROC,
     crc_type=CRCType.CRC16_X25,
     cteb_data=CTEBData(
-        {"trans_id": 10,
-#          "trans_series_id": 2,
-        "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}})}
+        {
+            "trans_id": 10,
+            #          "trans_series_id": 2,
+            "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
+        }
     ),
     crc=CRCFlag.CALCULATE,
 )
@@ -407,21 +419,23 @@ cte_block = CustodyTransferBlock(
 cre_block = CompressedReportingBlock(
     blk_type=BlockType.AUTO,
     blk_num=5,
-#     control_flags=0,
+    #     control_flags=0,
     crc_type=CRCType.CRC16_X25,
     creb_data=CREBData(
-        {"bundle_seq_num": 1,
-        "bundle_seq_id": 4,
-#         "rpt_request_flags": 0,
-#         "scope_node_id": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
-        "rpt_eid": EID({"uri": 2, "ssp": {"node_num": 305, "service_num": 2}})}
+        {
+            "bundle_seq_num": 1,
+            "bundle_seq_id": 4,
+            #         "rpt_request_flags": 0,
+            #         "scope_node_id": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
+            "rpt_eid": EID({"uri": 2, "ssp": {"node_num": 305, "service_num": 2}}),
+        }
     ),
     crc=CRCFlag.CALCULATE,
 )
 
 payload_block = PayloadBlock(
     blk_type=BlockType.AUTO,
-#     blk_num=1,
+    #     blk_num=1,
     control_flags=0,
     crc_type=CRCType.CRC16_X25,
     payload=b"\x00\x00\x00\x00\x00\x00\x00\x0chello world\n",
@@ -431,8 +445,14 @@ payload_block = PayloadBlock(
 # Use them to create a bundle object
 bundle_with_errors = Bundle(
     pri_block=primary_block,
-    canon_blocks=[prev_node_block, bundle_age_block, hop_count_block,
-        cte_block, cre_block, payload_block],
+    canon_blocks=[
+        prev_node_block,
+        bundle_age_block,
+        hop_count_block,
+        cte_block,
+        cre_block,
+        payload_block,
+    ],
 )
 
 error_json_filename = "errorjson.json"
@@ -458,14 +478,14 @@ assert errbundle_frombin.pri_block.version == 7
 # because control_flags and crc_type were left out, the dest_eid shifts into the
 # control_flags position and the EID, not typed as an EID, instead appears as an
 # array
-assert errbundle_frombin.pri_block.control_flags[0] == 2 
+assert errbundle_frombin.pri_block.control_flags[0] == 2
 assert errbundle_frombin.pri_block.control_flags[1][0] == 200
-assert errbundle_frombin.pri_block.control_flags[1][1] == 1 
+assert errbundle_frombin.pri_block.control_flags[1][1] == 1
 
 # Similarly the src_eid appears in the crc_type field
-assert errbundle_frombin.pri_block.crc_type[0] == 2 
+assert errbundle_frombin.pri_block.crc_type[0] == 2
 assert errbundle_frombin.pri_block.crc_type[1][0] == 100
-assert errbundle_frombin.pri_block.crc_type[1][1] == 1 
+assert errbundle_frombin.pri_block.crc_type[1][1] == 1
 
 # The rpt_eid is now in the dest_eid field, but since this field is an EID it is
 # properly typed as an EID, it is just the wrong one
@@ -482,7 +502,7 @@ assert errbundle_frombin.pri_block.src_eid[1] == 0
 assert errbundle_frombin.pri_block.rpt_eid == 3600000
 
 # Finally the CRC is in the creation_timestamp field and appears as bytes
-assert errbundle_frombin.pri_block.creation_timestamp == b'\x0b\x19'
+assert errbundle_frombin.pri_block.creation_timestamp == b"\x0b\x19"
 
 # The remaining fields (lifetime and crc) are now not set
 assert errbundle_frombin.pri_block.lifetime == None
@@ -518,7 +538,7 @@ assert errbundle_frombin.canon_blocks[1].control_flags == 1
 # as a cbor encoded integer 108000. This is an integer (major type 0) with
 # additional data 26 (binary 000 11010 = x1A), the 26 means the integer is 4
 # bytes long, which is 0x0001a5e0 = 108000.
-assert errbundle_frombin.canon_blocks[1].crc_type == b'\x1a\x00\x01\xa5\xe0'
+assert errbundle_frombin.canon_blocks[1].crc_type == b"\x1a\x00\x01\xa5\xe0"
 
 # The bundle age now contains the CRC
 assert errbundle_frombin.canon_blocks[1].bundle_age == b"\x39\xe2"
@@ -541,9 +561,9 @@ assert errbundle_frombin.canon_blocks[2].elements[2] == 1
 # pushes the hop_count (3) into that position of the array. And since this is
 # doubly cbor encoded it appears in the 4th position as a cbor encoded 1 element
 # array (0x81) with the lone value 3
-assert errbundle_frombin.canon_blocks[2].elements[3] == b'\x81\x03'
+assert errbundle_frombin.canon_blocks[2].elements[3] == b"\x81\x03"
 # Finally the CRC appears as the 5th element of the array
-assert errbundle_frombin.canon_blocks[2].elements[4] == b'\x88\xcd'
+assert errbundle_frombin.canon_blocks[2].elements[4] == b"\x88\xcd"
 # There are no other elements to the array
 
 
@@ -562,7 +582,7 @@ assert errbundle_frombin.canon_blocks[3].cteb_data[1][1][0] == 303
 assert errbundle_frombin.canon_blocks[3].cteb_data[1][1][1] == 1
 # The CRC in this case is right where it should. No elements were left out of
 # the CTEB block, there was only an element left out of the type-specific data
-assert errbundle_frombin.canon_blocks[3].crc == b'\x96\xc0'
+assert errbundle_frombin.canon_blocks[3].crc == b"\x96\xc0"
 
 
 # Parse Compressed Reporting Extension block
@@ -574,9 +594,12 @@ assert errbundle_frombin.canon_blocks[4].control_flags == 1
 # the CREBData ends up in the crc_type field and again since this is doubly
 # cbor encoded it appears as a cbor encoded array, in this case a fairly lengthy
 # one
-assert errbundle_frombin.canon_blocks[4].crc_type == b'\x83\x01\x04\x82\x02\x82\x19\x01\x31\x02'
+assert (
+    errbundle_frombin.canon_blocks[4].crc_type
+    == b"\x83\x01\x04\x82\x02\x82\x19\x01\x31\x02"
+)
 # And the CRC ends up in the creb_data field
-assert errbundle_frombin.canon_blocks[4].creb_data == b'\x05\x17'
+assert errbundle_frombin.canon_blocks[4].creb_data == b"\x05\x17"
 assert errbundle_frombin.canon_blocks[4].crc == None
 
 
@@ -592,7 +615,7 @@ assert (
     == b"\x00\x00\x00\x00\x00\x00\x00\x0chello world\n"
 )
 # The crc ends up in the payload
-assert errbundle_frombin.canon_blocks[5].payload == b'\x8d\x29'
+assert errbundle_frombin.canon_blocks[5].payload == b"\x8d\x29"
 # And the crc is not set
 assert errbundle_frombin.canon_blocks[5].crc == None
 
@@ -638,9 +661,9 @@ primary_block = PrimaryBlock(
     crc_type=CRCType.CRC16_X25,
     dest_eid=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
     src_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
-#     rpt_eid=EID({"uri": 2, "ssp": {"node_num": 300, "service_num": 1}}),
+    #     rpt_eid=EID({"uri": 2, "ssp": {"node_num": 300, "service_num": 1}}),
     rpt_eid=EID({"uri": 2, "ssp": {"service_num": 1}}),
-#     creation_timestamp=CreationTimestamp({"time": 755533838904, "sequence": 0}),
+    #     creation_timestamp=CreationTimestamp({"time": 755533838904, "sequence": 0}),
     creation_timestamp=CreationTimestamp({"time": 755533838904}),
     lifetime=3600000,
     crc=b"\x0b\x19",
@@ -649,7 +672,7 @@ primary_block = PrimaryBlock(
 # Use it to create a bundle object
 bundle_again = Bundle(
     pri_block=primary_block,
-    )
+)
 
 bundle_again_json_filename = "bundle_again.json"
 bundle_again.to_json_file(bundle_again_json_filename)
@@ -705,7 +728,7 @@ primary_block = PrimaryBlock(
 
 bundle_dtn = Bundle(
     pri_block=primary_block,
-    )
+)
 
 bundle_dtn_bytes = bundle_dtn.to_bytes()
 print(f'bundle_dtn_bytes:\n{codecs.encode(bundle_dtn_bytes,"hex")}\n')
@@ -757,9 +780,11 @@ cte_block = CustodyTransferBlock(
     control_flags=BlockPCFlags.REP_UNPROC,
     crc_type=CRCType.CRC16_X25,
     cteb_data=CTEBData(
-        {"trans_id": 10,
-        "trans_series_id": 2,
-        "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}})}
+        {
+            "trans_id": 10,
+            "trans_series_id": 2,
+            "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
+        }
     ),
     crc=CRCFlag.CALCULATE,
 )
@@ -770,11 +795,15 @@ cre_block = CompressedReportingBlock(
     control_flags=0,
     crc_type=CRCType.CRC16_X25,
     creb_data=CREBData(
-        {"bundle_seq_num": 1,
-        "bundle_seq_id": 4,
-        "rpt_request_flags": 0,
-        "scope_node_id": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
-        "rpt_eid": EID({"uri": 2, "ssp": {"node_num": 305, "service_num": 2}})}
+        {
+            "bundle_seq_num": 1,
+            "bundle_seq_id": 4,
+            "rpt_request_flags": 0,
+            "scope_node_id": EID(
+                {"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}
+            ),
+            "rpt_eid": EID({"uri": 2, "ssp": {"node_num": 305, "service_num": 2}}),
+        }
     ),
     crc=CRCFlag.CALCULATE,
 )
@@ -791,8 +820,14 @@ payload_block = PayloadBlock(
 # Use them to create a bundle object
 wrong_block_types_bundle = Bundle(
     pri_block=primary_block,
-    canon_blocks=[prev_node_block, bundle_age_block, hop_count_block,
-        cte_block, cre_block, payload_block],
+    canon_blocks=[
+        prev_node_block,
+        bundle_age_block,
+        hop_count_block,
+        cte_block,
+        cre_block,
+        payload_block,
+    ],
 )
 
 wrong_types_bytes = wrong_block_types_bundle.to_bytes()
@@ -808,21 +843,21 @@ print(f'\nfrom_wrong_bundle_bytes:\n{codecs.encode(from_wrong_bundle_bytes,"hex"
 
 # The original bundle bytes and the bytes from the interpreted bytes should be
 # the same
-assert(wrong_types_bytes == from_wrong_bundle_bytes)
+assert wrong_types_bytes == from_wrong_bundle_bytes
 
 # The blocks get interpreted as the wrong type blocks because the block types
 # were set incorrectly. In this case what was actually a PrevNodeBlock, and so
 # had an EID as the type-specific data, appears to be a BundleAgeBlock. Since
 # it's not expecting an EID, it does not get set as an EID instance, rather to
 # the array that an EID is represented as.
-assert(isinstance(from_wrong_bundle.canon_blocks[0], BundleAgeBlock))
-assert(from_wrong_bundle.canon_blocks[0].bundle_age == [2, [300, 2 ]])
+assert isinstance(from_wrong_bundle.canon_blocks[0], BundleAgeBlock)
+assert from_wrong_bundle.canon_blocks[0].bundle_age == [2, [300, 2]]
 
 # Here it's the opposite. What was a BundleAgeBlock was set as a PrevNodeBlock.
 # When the bytes are read back in and it sees a PrevNodeBlock, the EID is
 # actually a bundle age (int), so it sets the prev_eid as the int
-assert(isinstance(from_wrong_bundle.canon_blocks[1], PrevNodeBlock))
-assert(from_wrong_bundle.canon_blocks[1].prev_eid == 108000)
+assert isinstance(from_wrong_bundle.canon_blocks[1], PrevNodeBlock)
+assert from_wrong_bundle.canon_blocks[1].prev_eid == 108000
 
 # In this case the Hop Count Block was wrongly typed as a CompressedReportingBlock
 # When interpreting the bytes for the type-specific data it still looks like
@@ -830,55 +865,46 @@ assert(from_wrong_bundle.canon_blocks[1].prev_eid == 108000)
 # are ints, and the hop count data is 2 ints, so it creates a CREBData instance
 # and sets the first two elements to the HopCountData values, and the others
 # are set to None
-assert(isinstance(from_wrong_bundle.canon_blocks[2], CompressedReportingBlock))
-assert(isinstance(from_wrong_bundle.canon_blocks[2].creb_data, CREBData))
-assert(from_wrong_bundle.canon_blocks[2].creb_data.bundle_seq_num == 15)
-assert(from_wrong_bundle.canon_blocks[2].creb_data.bundle_seq_id == 3)
-assert(from_wrong_bundle.canon_blocks[2].creb_data.rpt_request_flags == None)
-assert(from_wrong_bundle.canon_blocks[2].creb_data.scope_node_id == None)
-assert(from_wrong_bundle.canon_blocks[2].creb_data.rpt_eid == None)
+assert isinstance(from_wrong_bundle.canon_blocks[2], CompressedReportingBlock)
+assert isinstance(from_wrong_bundle.canon_blocks[2].creb_data, CREBData)
+assert from_wrong_bundle.canon_blocks[2].creb_data.bundle_seq_num == 15
+assert from_wrong_bundle.canon_blocks[2].creb_data.bundle_seq_id == 3
+assert from_wrong_bundle.canon_blocks[2].creb_data.rpt_request_flags == None
+assert from_wrong_bundle.canon_blocks[2].creb_data.scope_node_id == None
+assert from_wrong_bundle.canon_blocks[2].creb_data.rpt_eid == None
 
 # In this case what was a CustodyTransferBlock is set as a PayloadBlock. The
 # payload is expecting a byte string, but instead it's CTEBData. In the case of
 # the payload block, the payload is not doubly cbor encoded, unlike the
 # type-specific data of other canonical blocks, so it doesn't cbor decode this
 # "payload" and it is the byte string cbor representation of that CTEBData
-assert(isinstance(from_wrong_bundle.canon_blocks[3], PayloadBlock))
-assert(from_wrong_bundle.canon_blocks[3].payload == b'\x83\x0a\x02\x82\x02\x82\x19\x01\x2f\x01')
+assert isinstance(from_wrong_bundle.canon_blocks[3], PayloadBlock)
+assert (
+    from_wrong_bundle.canon_blocks[3].payload
+    == b"\x83\x0a\x02\x82\x02\x82\x19\x01\x2f\x01"
+)
 
 # Here what was a CompressedReportingBlock is wrongly typed as a HopCountBlock.
 # The type-specific data ends up as the array representing the CREBData, in this
 # case a full 5-item CREBData
-assert(isinstance(from_wrong_bundle.canon_blocks[4], HopCountBlock))
-assert(from_wrong_bundle.canon_blocks[4].hop_data == 
-    [
-        1,
-        4,
-        0,
-        [
-            2,
-            [
-                303,
-                1
-            ]
-        ],
-        [
-            2,
-            [
-                305,
-                2
-            ]
-        ]
-    ]
-)
+assert isinstance(from_wrong_bundle.canon_blocks[4], HopCountBlock)
+assert from_wrong_bundle.canon_blocks[4].hop_data == [
+    1,
+    4,
+    0,
+    [2, [303, 1]],
+    [2, [305, 2]],
+]
 
 # Lastly what was a PayloadBlock is wrongly typed as a CustodyTransferBlock.
 # The cteb data ends up as the payload data. Payload data is not doubly cbor
 # encoded. When it tries to decode it a second time it fails and in this case
 # it passes through the original value, which is the payload byte string
-assert(isinstance(from_wrong_bundle.canon_blocks[5], CustodyTransferBlock))
-assert(from_wrong_bundle.canon_blocks[5].cteb_data == b"\x00\x00\x00\x00\x00\x00\x00\x0chello world\n")
-
+assert isinstance(from_wrong_bundle.canon_blocks[5], CustodyTransferBlock)
+assert (
+    from_wrong_bundle.canon_blocks[5].cteb_data
+    == b"\x00\x00\x00\x00\x00\x00\x00\x0chello world\n"
+)
 
 
 # Define primary block settings for generation - everything is like in creating
@@ -892,8 +918,8 @@ primary_block_settings = PrimaryBlockSettings(
     src_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
     rpt_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
     creation_timestamp={
-        "time": {"start": 755533838904, "increment": 256}, 
-        "sequence": {"start": 0} 
+        "time": {"start": 755533838904, "increment": 256},
+        "sequence": {"start": 0},
     },
     lifetime=3600000,
     crc=CRCFlag.CALCULATE,
@@ -911,8 +937,8 @@ payload_block_settings = PayloadBlockSettings(
 )
 # At least make sure the payload_size field is correctly set
 gen_pay_len = len(payload_block_settings.generate(1).payload)
-assert(gen_pay_len >= 128)
-assert(gen_pay_len <= 129)
+assert gen_pay_len >= 128
+assert gen_pay_len <= 129
 
 
 # Bundles are then generated by the calling the Bundle @classmethod generate
@@ -925,11 +951,11 @@ generated_bundles = Bundle.generate(
     # bundles with multiple canonical blocks by providing multiple settings
     # instances, though currently only the payload block is supported. You can
     # create bundles erroneously with multiple payload blocks or even no blocks
-    canon_settings=[payload_block_settings]
+    canon_settings=[payload_block_settings],
 )
 
-print (f'\n{len(generated_bundles)} generated bundles:')
-print ("-------------------------------")
+print(f"\n{len(generated_bundles)} generated bundles:")
+print("-------------------------------")
 for x in generated_bundles:
     encoded = x.to_bytes()
     print(f'{codecs.encode(encoded,"hex")}\n')
@@ -946,10 +972,7 @@ primary_block_settings = PrimaryBlockSettings(
     dest_eid=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
     src_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
     rpt_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
-    creation_timestamp={
-        "time": "current", 
-        "sequence": {"fixed": 5}
-    },
+    creation_timestamp={"time": "current", "sequence": {"fixed": 5}},
     lifetime=3600000,
     crc=CRCFlag.CALCULATE,
 )
@@ -959,7 +982,7 @@ payload_block_settings = PayloadBlockSettings(
     blk_num=1,
     control_flags=0,
     crc_type=CRCType.CRC16_X25,
-    payload={"min_size": 10*1024*1024, "max_size": 10*1024*1024},
+    payload={"min_size": 10 * 1024 * 1024, "max_size": 10 * 1024 * 1024},
     crc=CRCFlag.CALCULATE,
 )
 
@@ -971,14 +994,14 @@ generated_bundles = Bundle.generate(
     # seconds. With the size of payload we are generating there is already a
     # short delay, this delay value just makes it a little larger.
     pri_settings=primary_block_settings,
-    canon_settings=[payload_block_settings]
+    canon_settings=[payload_block_settings],
 )
 
-print (f'\n{len(generated_bundles)} generated bundles:')
-print ("-------------------------------")
+print(f"\n{len(generated_bundles)} generated bundles:")
+print("-------------------------------")
 for x in generated_bundles:
-    print(f'Payload size: {len(x.canon_blocks[0].payload)} bytes')
-    print(f'Creation Time: {x.pri_block.creation_timestamp.time}\n')
+    print(f"Payload size: {len(x.canon_blocks[0].payload)} bytes")
+    print(f"Creation Time: {x.pri_block.creation_timestamp.time}\n")
 
 
 primary_block = PrimaryBlock(
@@ -1016,18 +1039,20 @@ print(f'badpayloadbundlebytes =\n{codecs.encode(badpayloadbundlebytes,"hex")}')
 # decode it and get as bytes again
 badpayloadbundleback = Bundle.from_bytes(badpayloadbundlebytes)
 badpayloadbundlebytesagain = badpayloadbundleback.to_bytes()
-print(f'\nbadpayloadbundlebytesagain =\n{codecs.encode(badpayloadbundlebytesagain,"hex")}')
+print(
+    f'\nbadpayloadbundlebytesagain =\n{codecs.encode(badpayloadbundlebytesagain,"hex")}'
+)
 
 # Make sure they are the same
-assert(badpayloadbundlebytes == badpayloadbundlebytesagain)
+assert badpayloadbundlebytes == badpayloadbundlebytesagain
 
 # Verify that the payload is (incorrectly) a CBOR encoded unsigned integer
 # instead of a byte string
 ba = bytearray(badpayloadbundlebytesagain)
 print(f'\nbadpayload = {codecs.encode(ba[47:50], "hex")}')
-assert(ba[47] == 0x19)   # A CBOR unsigned int in two bytes (additional info 25)
-assert(ba[48] == 0x12)
-assert(ba[49] == 0x34)
+assert ba[47] == 0x19  # A CBOR unsigned int in two bytes (additional info 25)
+assert ba[48] == 0x12
+assert ba[49] == 0x34
 
 # Generate a junk random bundle (random data unit) and print it out as hex
 junk_bundle = Bundle.generate_random(size=256)
@@ -1036,7 +1061,7 @@ print(f'\njunk_bundle = {codecs.encode(junk_bundle, "hex")}\n')
 # Generate a junk random bundle of maximum size and write it to a binary file.
 # Note that it also is returned from the method, but here we do not do anything
 # with it
-Bundle.generate_random(size=10*1024*1024, filename="junk.bin")
+Bundle.generate_random(size=10 * 1024 * 1024, filename="junk.bin")
 
 
 # Create a Primary Block with invalid CBOR encoding of the lifetime. Here the
@@ -1054,7 +1079,7 @@ primary_block = PrimaryBlock(
     src_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
     rpt_eid=EID({"uri": 2, "ssp": {"node_num": 300, "service_num": 1}}),
     creation_timestamp=CreationTimestamp({"time": 755533838904, "sequence": 0}),
-    lifetime = 3600000,
+    lifetime=3600000,
     crc=CRCFlag.CALCULATE,
 )
 
@@ -1066,7 +1091,7 @@ good_cbor_bundle = Bundle(
 # Encode it to bytes, which contains the good CBOR encoding
 good_cbor_encoded = good_cbor_bundle.to_bytes()
 
-# Now create the bad cbor encoded bundle by modifying the good one. 
+# Now create the bad cbor encoded bundle by modifying the good one.
 orig_lifetime = primary_block.lifetime
 primary_block.lifetime = InvalidCBOR(value=orig_lifetime, additional_info=31)
 
@@ -1081,7 +1106,9 @@ bad_cbor_bundle.to_bytes_file("bad_cbor_bundle.bin")
 
 print(f'\ngood_cbor = {codecs.encode(good_cbor_encoded, "hex")}')
 print(f' bad_cbor = {codecs.encode(bad_cbor_encoded, "hex")}')
-print('                                                                                    ^^^^^^^^^^\n')
+print(
+    "                                                                                    ^^^^^^^^^^\n"
+)
 
 # Write it to json, read it back in, write it back out
 bad_cbor_bundle.to_json_file("bad_cbor_bundle.json")
@@ -1089,7 +1116,7 @@ bad_cbor_again = Bundle.from_json_file("bad_cbor_bundle.json")
 bad_cbor_again.to_json_file("bad_cbor_again.json")
 
 # Attempt to decode the bytes, which will fail with a CBOR decode value error
-print('\nAttempt to decode the bad encoding. This should fail:\n')
+print("\nAttempt to decode the bad encoding. This should fail:\n")
 try:
     Bundle.from_bytes(bad_cbor_encoded)
 except cbor2.CBORDecodeValueError:
@@ -1120,7 +1147,7 @@ bad_cbor_again = Bundle.from_json_file("bad_cbor_bundle_2_2.json")
 bad_cbor_again.to_json_file("bad_cbor_again_2.json")
 
 # Attempt to decode the bytes, which should fail with a CBOR decode value error
-print('\nAttempt to decode the bad encoding. This should fail:\n')
+print("\nAttempt to decode the bad encoding. This should fail:\n")
 try:
     Bundle.from_bytes(bad_cbor_encoded)
 except cbor2.CBORDecodeValueError:
@@ -1132,25 +1159,27 @@ print()
 # info of 31, which as noted above is NOT invalid, so this produces a ValueError
 # on creation.
 try:
-    invalid_eid = \
+    invalid_eid = (
         InvalidCBOR(
             value=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
-            additional_info=31
+            additional_info=31,
         ),
+    )
 except ValueError:
     traceback.print_exc()
-    
+
 print()
 
 # Lastly, for all types, the only invalid values are 28-30 or 31, so attempting
 # to set the invalid additional_info to a different number, 27 in this case,
 # also produces a ValueError on creation.
 try:
-    invalid_eid= \
+    invalid_eid = (
         InvalidCBOR(
             value=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
-            additional_info=27
+            additional_info=27,
         ),
+    )
 except ValueError:
     traceback.print_exc()
 
@@ -1159,26 +1188,28 @@ another_bad_bundle = copy.deepcopy(good_cbor_bundle)
 # replace the lifetime (3600000 = 0x0036ee80), which in cbor is encoded as major
 # type 0, additional info 26 (0x1a) and then 4 bytes for the value, with the
 # same encoding, but missing the last byte
-another_bad_bundle.pri_block.lifetime=RawData(b'\x1a\x00\x36\xee')
+another_bad_bundle.pri_block.lifetime = RawData(b"\x1a\x00\x36\xee")
 
 # Testing encoding as json and from json
 another_bad_json = another_bad_bundle.to_json()
 another_bad_from_json = Bundle.from_json(another_bad_json)
 another_bad_json_from_json = another_bad_from_json.to_json()
-assert (another_bad_json == another_bad_json_from_json)
+assert another_bad_json == another_bad_json_from_json
 
 # Encode as bytes and print comparison to the good bundle
 another_bad_encoded = another_bad_bundle.to_bytes()
 
 print(f'\ngood_cbor = {codecs.encode(good_cbor_encoded, "hex")}')
 print(f' bad_cbor = {codecs.encode(another_bad_encoded, "hex")}')
-print('                                                                                    ^^^^^^^^^^')
+print(
+    "                                                                                    ^^^^^^^^^^"
+)
 
 # Try to decode the bundle. It should fail with a premature end-of-stream error.
-print('Attempt to decode the bad encoding. This should fail:\n')
+print("Attempt to decode the bad encoding. This should fail:\n")
 try:
     another_bad_decoded = Bundle.from_bytes(another_bad_encoded)
 except cbor2.CBORDecodeEOF:
     traceback.print_exc()
-    
-print('\nDone')
+
+print("\nDone")

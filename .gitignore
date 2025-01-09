@@ -1,7 +1,7 @@
 Pipfile
-*.json
-*.bin
+/*.json
+/*.bin
 /dist/
 build/
-/dtngen.egg-info/
+/*.egg-info/
 __pycache__/

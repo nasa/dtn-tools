@@ -24,3 +24,5 @@ repos:
           flake8-docstrings,
           flake8-rst-docstrings
         ]
+
+exclude: 'examples/.*'

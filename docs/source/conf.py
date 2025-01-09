@@ -7,7 +7,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 from datetime import datetime
 
-project = "dtngen"
+project = "dtntools"
 copyright = f"{datetime.now().year}, NASA GSFC"
 author = "NASA GSFC"
 
@@ -15,12 +15,18 @@ author = "NASA GSFC"
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = ["autoapi.extension"]
-autoapi_dirs = ["../../dtngen"]
+autoapi_dirs = ["../../dtntools/"]
 
 templates_path = ["_templates"]
 exclude_patterns = []
 
-autoapi_options = [ 'members', 'undoc-members', 'show-inheritance', 'show-module-summary', 'imported-members', ]
+autoapi_options = [
+    "members",
+    "undoc-members",
+    "show-inheritance",
+    "show-module-summary",
+    "imported-members",
+]
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
@@ -36,7 +42,7 @@ def skip_what(app, what, name, obj, skip, options):
     # Don't skip __init__ methods
     if what == "method" and what_name == "__init__":
         skip = False
-    
+
     return skip
 
 

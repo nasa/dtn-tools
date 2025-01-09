@@ -1,11 +1,11 @@
 from setuptools import find_packages, setup
 
-from dtngen import __version__
+from __version__ import __version__
 
 # Package metadata
-name = "dtngen"
+name = "dtntools"
 version = str(__version__)
-description = "Generates and interpretes DTN bundles"
+description = "GSFC DTN Test Tools Suite"
 
 # Package dependencies
 dependencies = ["cbor2>=5.6.2", "crccheck>=1.3.0"]

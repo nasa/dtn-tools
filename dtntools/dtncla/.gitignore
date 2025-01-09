@@ -1,0 +1,8 @@
+Pipfile
+*.json
+*.bin
+*.egg-info
+/dist/
+build/
+/dtngen.egg-info/
+__pycache__/
