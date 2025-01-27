@@ -1,0 +1,98 @@
+{
+    "hdtnConfigName": "my hdtn config",
+    "userInterfaceOn": true,
+    "mySchemeName": "unused_scheme_name",
+    "myNodeId": 20,
+    "myBpEchoServiceId": 2047,
+    "myCustodialSsp": "unused_custodial_ssp",
+    "myCustodialServiceId": 0,
+    "myRouterServiceId": 100,
+    "isAcsAware": true,
+    "acsMaxFillsPerAcsPacket": 100,
+    "acsSendPeriodMilliseconds": 1000,
+    "retransmitBundleAfterNoCustodySignalMilliseconds": 10000,
+    "maxBundleSizeBytes": 10000000,
+    "maxIngressBundleWaitOnEgressMilliseconds": 2000,
+    "bufferRxToStorageOnLinkUpSaturation": false,
+    "maxLtpReceiveUdpPacketSizeBytes": 65536,
+    "neighborDepletedStorageDelaySeconds": 0,
+    "fragmentBundlesLargerThanBytes": 0,
+    "enforceBundlePriority": false,
+    "zmqBoundRouterPubSubPortPath": 10200,
+    "zmqBoundTelemApiPortPath": 10305,
+    "inductsConfig": {
+        "inductConfigName": "myconfig",
+        "inductVector": [
+            {
+                "name": "udp_ingress",
+                "convergenceLayer": "udp",
+                "boundPort": 4556,
+                "numRxCircularBufferElements": 200,
+                "numRxCircularBufferBytesPerElement": 65535
+            },
+            {
+                "name": "udp_ingress",
+                "convergenceLayer": "udp",
+                "boundPort": 4558,
+                "numRxCircularBufferElements": 200,
+                "numRxCircularBufferBytesPerElement": 65535
+            },
+            {
+                "name": "udp_ingress",
+                "convergenceLayer": "udp",
+                "boundPort": 4560,
+                "numRxCircularBufferElements": 200,
+                "numRxCircularBufferBytesPerElement": 65535
+            }
+        ]
+    },
+    "outductsConfig": {
+        "outductConfigName": "myconfig",
+        "outductVector": [
+            {
+                "name": "udp_egress1",
+                "convergenceLayer": "udp",
+                "nextHopNodeId": 102,
+                "remoteHostname": "X.X.X.X",
+                "remotePort": 4557,
+                "maxNumberOfBundlesInPipeline": 50,
+                "maxSumOfBundleBytesInPipeline": 50000000
+            },
+            {
+                "name": "udp_egress2",
+                "convergenceLayer": "udp",
+                "nextHopNodeId": 103,
+                "remoteHostname": "X.X.X.X",
+                "remotePort": 4559,
+                "maxNumberOfBundlesInPipeline": 50,
+                "maxSumOfBundleBytesInPipeline": 50000000
+            },
+            {
+                "name": "udp_egress3",
+                "convergenceLayer": "udp",
+                "nextHopNodeId": 104,
+                "remoteHostname": "X.X.X.X",
+                "remotePort": 4561,
+                "maxNumberOfBundlesInPipeline": 50,
+                "maxSumOfBundleBytesInPipeline": 50000000
+            }
+        ]
+    },
+    "storageConfig": {
+        "storageImplementation": "asio_single_threaded",
+        "tryToRestoreFromDisk": false,
+        "autoDeleteFilesOnExit": true,
+        "totalStorageCapacityBytes": 8192000000,
+        "storageDeletionPolicy" : "never",
+        "storageDiskConfigVector": [
+            {
+                "name": "d1",
+                "storeFilePath": ".\/store1.bin"
+            },
+            {
+                "name": "d2",
+                "storeFilePath": ".\/store2.bin"
+            }
+        ]
+    }
+}
