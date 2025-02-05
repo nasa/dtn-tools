@@ -1,7 +1,7 @@
 # Cloud Instance Performance Test - TX Side (250,000 bundles)
 # Includes use of Data Sender
 # Convergence Layer: UDP
-# This version of the script does NOT work in OpenC3 COSMOS
+# This version of the script only works in OpenC3 COSMOS
 
 # Prerequisites:
 # - DTN Gen / DTN CLA packages installed
@@ -43,6 +43,9 @@ from dtntools.dtngen.types import (
 
 warnings.simplefilter("always")
 
+# Setting Script Runner line delay (comment out for command line execution)
+set_line_delay(0.000)
+
 print("Defining new primary and payload blocks")
 primary_block_settings = PrimaryBlockSettings(
     version=7,
@@ -59,7 +62,7 @@ primary_block_settings = PrimaryBlockSettings(
     crc=CRCFlag.CALCULATE,
 )
 
-payload_size = int(input("Choose payload size (in bytes): "))
+payload_size = ask("Choose payload size (in bytes): ")
 print(f"Payload Size = {payload_size} bytes")
 
 payload_block_settings = PayloadBlockSettings(
@@ -82,10 +85,10 @@ print("Converting bundles to bytes")
 bundle_data = [x.to_bytes() for x in generated_bundles]
 
 print("Configuring the Data Sender")
-send_to_ip = input("Enter IP address to send to (X.X.X.X): ")
+send_to_ip = ask("Enter IP address to send to (X.X.X.X): ")
 print(f"Send to IP Address = {send_to_ip}")
 
-rate_limit = int(input("Choose rate limit (in Mbps): "))
+rate_limit = ask("Choose rate limit (in Mbps): ")
 print(f"Rate Limit = {rate_limit} Mbps")
 
 data_sender = UdpTxSocket(send_to_ip, 4556, bps_limit=(1000000 * rate_limit))
@@ -99,11 +102,12 @@ try:
     print(f"Sending Start Time = {Start_Time}")
 
     print("Sending bundles....")
-    while loops < 5000:
-        loops = loops + 1
+    with disable_instrumentation():
+        while loops < 5000:
+            loops = loops + 1
 
-        for x in bundle_data:
-            data_sender.write(x)
+            for x in bundle_data:
+                data_sender.write(x)
 
     End_Time = time.time()
     print(f"Sending End Time = {End_Time}")

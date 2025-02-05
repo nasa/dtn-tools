@@ -17,7 +17,7 @@ warnings.simplefilter("always")
 # set_line_delay(0.000)
 
 print("Configuring the Data Receiver")
-data_receiver = UdpRxSocket("0.0.0.0", 4558)
+data_receiver = UdpRxSocket("0.0.0.0", 4556)
 
 print("Connecting the Data Receiver")
 data_receiver.connect()
