@@ -50,12 +50,13 @@ from dtntools.dtngen.types import (
 from dtntools.dtncla.udp import UdpRxSocket, UdpTxSocket
 
 
-HDTN_IP = int(input("Enter IP address of HDTN to send to (X.X.X.X), enter 'exit' to quit: ")))
-print("You entered: ", HDTN_IP)
+input_response = input("Enter IP address of HDTN to send to (X.X.X.X), enter 'end' to exit: ")
+print("You entered: ", input_response)
 
-if HDTN_IP == "exit":
+if input_response == "end":
     sys.exit(0) # this 0 indicates a successful exit, this could have been a string but would indicate an error on exit
 
+HDTN_IP   = input_response
 HDTN_PORT = 4556
 LOCAL_IP = "0.0.0.0"
 LOCAL_PORT = 4558
@@ -1111,7 +1112,7 @@ def nom_bundle_test():
         control_flags=BlockPCFlags.FRAG_REPLICATE | BlockPCFlags.DEL_UNPROC,
         crc_type=CRCType.NONE, # was: crc_type=CRCType.CRC16_X25,
         bundle_age=88000, # bundle_age=108000,
-        crc=CRCFlag.CALCULATE, # will be different due to blk_num change
+        # was(removed due to CRCType.NONE): crc=CRCFlag.CALCULATE, # will be different due to blk_num change
     )
     
     print(  "--> <*> (DTN.TEST.00120, DTN.TEST.00130, DTN.TEST.00135, DTN.TEST.00140) Age Block Re-created.")
