@@ -438,6 +438,8 @@ class Bundle:
 
         return junk_bytes
 
+    def __eq__(self, other):
+        return self.to_json() == other.to_json()
 
 def _flatten(non_flat_list):
     flat = []
