@@ -1309,7 +1309,6 @@ def test_legacy_suite():
     except cbor2.CBORDecodeEOF:
         traceback.print_exc()
 
-    print("\nDone")
 
 
 def test_bundle_eq_operator():
@@ -1319,6 +1318,47 @@ def test_bundle_eq_operator():
     bundle_b = create_valid_bundle()
     assert bundle_a == bundle_b
 
+def test_bundle_gen_variable_payload():
+    """Verify that the payload for bundle generate ends up being variable size."""
+    # Create a payload block settings with variable length
+    primary_block_settings = PrimaryBlockSettings(
+        version=7,
+        control_flags=BundlePCFlags.MUST_NOT_FRAGMENT,
+        crc_type=CRCType.CRC16_X25,
+        dest_eid=EID({"uri": 2, "ssp": {"node_num": 103, "service_num": 1}}),
+        src_eid=EID({"uri": 2, "ssp": {"node_num": 101, "service_num": 1}}),
+        rpt_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+        creation_timestamp={
+            "time": {"start": 755533838904, "increment": 256},
+            "sequence": {"start": 0},
+        },
+        lifetime=3600000,
+        crc=CRCFlag.CALCULATE,
+    )
+    payload_block_settings = PayloadBlockSettings(
+        blk_type=BlockType.AUTO,
+        blk_num=1,
+        control_flags=0,
+        crc_type=CRCType.CRC16_X25,
+        payload={"min_size": 512, "max_size": 8192},
+        crc=CRCFlag.CALCULATE,
+    )
+    # Generate 50 bundles with various lengths
+    generated_bundles = Bundle.generate(
+        num_bundles=50,
+        pri_settings=primary_block_settings,
+        canon_settings=[payload_block_settings],
+    )
+
+    # Verify that at least one of these bundles has a different payload size
+    payload_lens = []
+    for bundle in generated_bundles:
+        payload_block = bundle.canon_blocks[-1]
+        payload_lens.append(len(payload_block.payload))
+    assert(len(set(payload_lens)) > 1)
+
 if __name__ == "__main__":
     test_legacy_suite()
     test_bundle_eq_operator()
+    test_bundle_gen_variable_payload()
+    print("UNIT TEST PASS")

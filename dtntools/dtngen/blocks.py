@@ -1172,30 +1172,32 @@ class PayloadBlockSettings:
         self.control_flags = control_flags
         self.crc_type = crc_type
         self.crc = crc
-        self.payload_size = 0
+        self.min_payload_size = 0
+        self.max_payload_size = 0
 
-        if isinstance(payload, dict):
-            min_size = payload.get("min_size", None)
-            max_size = payload.get("max_size", None)
-            if (min_size is None) or (max_size is None):
-                raise ValueError(
-                    "Expected payload dictionary to contain a 'min_size' and 'max_size' field"
-                )
+        if not isinstance(payload, dict):
+            raise TypeError(
+                f"Expected PayloadBlockSettings.payload to be a dict. Got {type(payload)}"
+            )
 
-            # Sanity check min and max size
-            if min_size < 0:
-                min_size = 0
-            if max_size < 0:
-                max_size = 0
-            if max_size < min_size:
-                max_size = min_size
-            if max_size > PayloadBlockSettings.MAX_PAYLOAD_SIZE:
-                warnings.warn(
-                    "max_size param larger than BPv7 max payload size of 10MB"
-                )
+        min_size = payload.get("min_size", None)
+        max_size = payload.get("max_size", None)
+        if (min_size is None) or (max_size is None):
+            raise ValueError(
+                "Expected payload dictionary to contain a 'min_size' and 'max_size' field"
+            )
+        # Sanity check min and max size
+        if min_size < 0:
+            min_size = 0
+        if max_size < 0:
+            max_size = 0
+        if max_size < min_size:
+            max_size = min_size
+        if max_size > PayloadBlockSettings.MAX_PAYLOAD_SIZE:
+            warnings.warn("max_size param larger than BPv7 max payload size of 10MB")
 
-            # Min Size and Max Size are sane at this point, pick a random value between them
-            self.payload_size = random.randrange(int(min_size), int(max_size) + 1)
+        self.min_payload_size = min_size
+        self.max_payload_size = max_size
 
     def generate(self, bundle_num):
         """Generate a payload block with the settings in this PayloadBundleSettings. bundle_num is ignored.
@@ -1212,7 +1214,10 @@ class PayloadBlockSettings:
             generated_payload_block = payload_block_settings.generate(0)
         """
         # generate a random byte string payload of the specified size in bytes
-        generated_payload = os.urandom(self.payload_size)
+        payload_size = random.randrange(
+            int(self.min_payload_size), int(self.max_payload_size) + 1
+        )
+        generated_payload = os.urandom(payload_size)
 
         return PayloadBlock(
             blk_type=self.blk_type,
