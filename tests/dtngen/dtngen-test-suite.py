@@ -1,5 +1,6 @@
 import codecs
 import copy
+import datetime
 import traceback
 import warnings
 
@@ -33,8 +34,10 @@ from dtntools.dtngen.types import (
     InvalidCBOR,
     RawData,
     StatusRRFlags,
+    TimestampFlag,
     TypeWarning,
 )
+from dtntools.dtngen.utils import DtnTimeNowMs
 
 # Display every warning - by default it only shows the first warning of the type
 # and message content, from a specific line of code. Or set it to "ignore" to
@@ -60,6 +63,7 @@ def recv_candidate_bundle():
     bplib_sample_bundle = "9f8907040182028218c801820282186401820282186401821b000000afe9537a38001a0036ee80420b19861849184900014682028218640a426747860101000154000000000000000c68656c6c6f20776f726c640a427a2fff"
 
     return bytes.fromhex(bplib_sample_bundle)
+
 
 def create_valid_bundle():
     primary_block = PrimaryBlock(
@@ -110,7 +114,9 @@ def create_valid_bundle():
             {
                 "trans_id": 10,
                 "trans_series_id": 2,
-                "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
+                "req_orig_eid": EID(
+                    {"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}
+                ),
             }
         ),
         crc=CRCFlag.CALCULATE,
@@ -157,6 +163,7 @@ def create_valid_bundle():
         ],
     )
 
+
 ## TESTS BEGIN ##
 def test_legacy_suite():
     # DO NOT ADD ANY MORE TESTS TO THIS FUNCTION #
@@ -167,12 +174,10 @@ def test_legacy_suite():
     # Print the encoded bundle as a hex string
     print(f'\nOriginal bundle:\n{codecs.encode(candidate_bundle,"hex")}\n')
 
-
     # Step 2: Attempt to cbor decode the payload using the interpreter
     bundle = Bundle.from_bytes(candidate_bundle)
     if not bundle:
         raise ValueError("Bundle could not be parsed.")
-
 
     # Step 3: Access fields within the bundle as required by the test
     # Parsing Primary block
@@ -193,7 +198,6 @@ def test_legacy_suite():
     bplib_payload_str = bundle.canon_blocks[1].payload[8:].decode().strip()
     assert bplib_payload_str == "hello world"
 
-
     # Step 4: Re-encode the bundle
     encoded = bundle.to_bytes()
 
@@ -205,7 +209,6 @@ def test_legacy_suite():
 
     cand_json_filename = "cand_bundle.json"
     bundle.to_json_file(cand_json_filename)
-
 
     # Step 5: Define new primary and canonical blocks
     primary_block = PrimaryBlock(
@@ -256,7 +259,9 @@ def test_legacy_suite():
             {
                 "trans_id": 10,
                 "trans_series_id": 2,
-                "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
+                "req_orig_eid": EID(
+                    {"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}
+                ),
             }
         ),
         crc=CRCFlag.CALCULATE,
@@ -303,7 +308,6 @@ def test_legacy_suite():
         ],
     )
 
-
     # Step 6: Encode the bundle
     encoded = bundle.to_bytes()
 
@@ -314,7 +318,6 @@ def test_legacy_suite():
     filename = "bytesout.bin"
     bundle.to_bytes_file(filename)
 
-
     # Step 7: Decode the encoded bundle bytes
     bfrombytes = Bundle.from_bytes(encoded)
     if not bfrombytes:
@@ -324,7 +327,6 @@ def test_legacy_suite():
     bfromfile = Bundle.from_bytes_file(filename)
     if not bfromfile:
         raise ValueError("Output bundle from file could not be parsed.")
-
 
     # Step 8: Verify the bundle from file is identical to the input
     # Parse Primary block
@@ -438,14 +440,12 @@ def test_legacy_suite():
     read_bytes = bfrombytes.to_bytes()
     assert read_bytes == encoded
 
-
     # Step 10 : Write the bundle to a json file, then read the json file into a new
     # Bundle
     filename = "jsonout.json"
     bundle.to_json_file(filename)
 
     read_bundle = Bundle.from_json_file(filename)
-
 
     # Step 11: Verify the resulting bundle object is identical to the input
     read_bytes = read_bundle.to_bytes()
@@ -455,7 +455,6 @@ def test_legacy_suite():
 
     filename2 = "jsonout2.json"
     read_bundle.to_json_file(filename2)
-
 
     # Step 12: Define new primary and canonical blocks with missing elements
     primary_block = PrimaryBlock(
@@ -507,7 +506,9 @@ def test_legacy_suite():
             {
                 "trans_id": 10,
                 #          "trans_series_id": 2,
-                "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
+                "req_orig_eid": EID(
+                    {"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}
+                ),
             }
         ),
         crc=CRCFlag.CALCULATE,
@@ -566,7 +567,6 @@ def test_legacy_suite():
     # Read it back in as a Bundle
     errbundle_frombin = Bundle.from_bytes_file(error_bytes_filename)
 
-
     # Step 13: Verify the bundle as read from binary, is as expected
     # Parse Primary block
     # the version is in the correct position
@@ -605,7 +605,6 @@ def test_legacy_suite():
     assert errbundle_frombin.pri_block.lifetime == None
     assert errbundle_frombin.pri_block.crc == None
 
-
     # Parse canonical blocks
     # Parse Previous Node block
     assert errbundle_frombin.canon_blocks[0].blk_type == BlockType.PREVIOUS_NODE
@@ -620,7 +619,6 @@ def test_legacy_suite():
     # The remaining fields were not set
     assert errbundle_frombin.canon_blocks[0].prev_eid == None
     assert errbundle_frombin.canon_blocks[0].crc == None
-
 
     # Parse Bundle Age block
     assert errbundle_frombin.canon_blocks[1].blk_type == BlockType.BUNDLE_AGE
@@ -643,7 +641,6 @@ def test_legacy_suite():
     # And the crc field is not set
     assert errbundle_frombin.canon_blocks[1].crc == None
 
-
     # Parse Hop Count block
     # Here the block type was left out, which pushes the blk_num (3) into the
     # blk_type field. 3 is not a valid block type. In this case the block is then
@@ -663,7 +660,6 @@ def test_legacy_suite():
     assert errbundle_frombin.canon_blocks[2].elements[4] == b"\x88\xcd"
     # There are no other elements to the array
 
-
     # Parse Custody Transfer Extension block
     assert errbundle_frombin.canon_blocks[3].blk_type == BlockType.CUST_TRANS_EXT
     assert errbundle_frombin.canon_blocks[3].blk_num == 4
@@ -681,7 +677,6 @@ def test_legacy_suite():
     # the CTEB block, there was only an element left out of the type-specific data
     assert errbundle_frombin.canon_blocks[3].crc == b"\x96\xc0"
 
-
     # Parse Compressed Reporting Extension block
     assert errbundle_frombin.canon_blocks[4].blk_type == BlockType.COMP_RPT_EXT
     assert errbundle_frombin.canon_blocks[4].blk_num == 5
@@ -698,7 +693,6 @@ def test_legacy_suite():
     # And the CRC ends up in the creb_data field
     assert errbundle_frombin.canon_blocks[4].creb_data == b"\x05\x17"
     assert errbundle_frombin.canon_blocks[4].crc == None
-
 
     # Parse Payload block
     assert errbundle_frombin.canon_blocks[5].blk_type == BlockType.BUNDLE_PAYLOAD
@@ -724,7 +718,6 @@ def test_legacy_suite():
     errjson_frombin_filename = "errorfrombin.json"
     errbundle_frombin.to_json_file(errjson_frombin_filename)
 
-
     # Step 14: Define new bundle with missing Primary block and only one canonical
     # block (resulting in one one block in the cbor indefinite array)
     bundle_with_no_primary = Bundle(
@@ -749,7 +742,6 @@ def test_legacy_suite():
 
     bundle_from_junk = Bundle.from_bytes_file(no_blocks_bytes_filename)
     bundle_from_junk = Bundle.from_json_file(no_blocks_json_filename)
-
 
     # Step 16: Define new primary block with missing elements in subtypes
     primary_block = PrimaryBlock(
@@ -809,7 +801,6 @@ def test_legacy_suite():
     assert again_frombytes.pri_block.lifetime == 3600000
     assert again_frombytes.pri_block.crc == b"\x0b\x19"
 
-
     # Step 18: Create bundle with a dtn EID
     primary_block = PrimaryBlock(
         version=7,
@@ -829,7 +820,6 @@ def test_legacy_suite():
 
     bundle_dtn_bytes = bundle_dtn.to_bytes()
     print(f'bundle_dtn_bytes:\n{codecs.encode(bundle_dtn_bytes,"hex")}\n')
-
 
     # Step 19: Create bundle with incorrect extension block types
     primary_block = PrimaryBlock(
@@ -880,7 +870,9 @@ def test_legacy_suite():
             {
                 "trans_id": 10,
                 "trans_series_id": 2,
-                "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}),
+                "req_orig_eid": EID(
+                    {"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}
+                ),
             }
         ),
         crc=CRCFlag.CALCULATE,
@@ -936,7 +928,9 @@ def test_legacy_suite():
 
     from_wrong_bundle = Bundle.from_bytes(wrong_types_bytes)
     from_wrong_bundle_bytes = from_wrong_bundle.to_bytes()
-    print(f'\nfrom_wrong_bundle_bytes:\n{codecs.encode(from_wrong_bundle_bytes,"hex")}\n')
+    print(
+        f'\nfrom_wrong_bundle_bytes:\n{codecs.encode(from_wrong_bundle_bytes,"hex")}\n'
+    )
 
     # The original bundle bytes and the bytes from the interpreted bytes should be
     # the same
@@ -1003,7 +997,6 @@ def test_legacy_suite():
         == b"\x00\x00\x00\x00\x00\x00\x00\x0chello world\n"
     )
 
-
     # Define primary block settings for generation - everything is like in creating
     # a primary block, except creation_timestamp is a dictionary with settings
     # options
@@ -1037,7 +1030,6 @@ def test_legacy_suite():
     assert gen_pay_len >= 128
     assert gen_pay_len <= 129
 
-
     # Bundles are then generated by the calling the Bundle @classmethod generate
     # with the count and the primary and canonical block settings from above. An
     # list is returned with the specified number of bundles
@@ -1057,7 +1049,6 @@ def test_legacy_suite():
         encoded = x.to_bytes()
         print(f'{codecs.encode(encoded,"hex")}\n')
     #     print(x.to_json())
-
 
     # Another example, but with the bundle timestamped with the current DTN time at
     # time of generation, and a fixed sequence value. For the payload we use the
@@ -1099,7 +1090,6 @@ def test_legacy_suite():
     for x in generated_bundles:
         print(f"Payload size: {len(x.canon_blocks[0].payload)} bytes")
         print(f"Creation Time: {x.pri_block.creation_timestamp.time}\n")
-
 
     primary_block = PrimaryBlock(
         version=7,
@@ -1159,7 +1149,6 @@ def test_legacy_suite():
     # Note that it also is returned from the method, but here we do not do anything
     # with it
     Bundle.generate_random(size=10 * 1024 * 1024, filename="junk.bin")
-
 
     # Create a Primary Block with invalid CBOR encoding of the lifetime. Here the
     # additional info is changed to 31, which because this is major type 0 (unsigned
@@ -1355,7 +1344,70 @@ def test_bundle_gen_variable_payload():
     for bundle in generated_bundles:
         payload_block = bundle.canon_blocks[-1]
         payload_lens.append(len(payload_block.payload))
-    assert(len(set(payload_lens)) > 1)
+    assert len(set(payload_lens)) > 1
+
+
+def test_bundle_pri_blk_curr_dtntime():
+    """Verify that the primary block settings can be requested to calculate the current DTN Time."""
+    # Check the current time
+    CurrDtnTime = DtnTimeNowMs()
+
+    # Create a Primary Block without a creation timestamp
+    primary_block = PrimaryBlock(
+        version=7,
+        control_flags=BundlePCFlags.MUST_NOT_FRAGMENT,
+        crc_type=CRCType.CRC16_X25,
+        dest_eid=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
+        src_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+        rpt_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+        creation_timestamp=None,
+        lifetime=3600000,
+        crc=b"\x0b\x19",
+        timestamp_flag=TimestampFlag.CURR_TIME,
+    )
+
+    # Check that the time is at least our CurrDtnTime (before the creation of the block)
+    assert primary_block.creation_timestamp is not None
+    assert primary_block.creation_timestamp.time >= CurrDtnTime
+    assert primary_block.creation_timestamp.sequence == 0
+
+    # As a sanity check, make sure manual timestamp can be set still
+    primary_block = PrimaryBlock(
+        version=7,
+        control_flags=BundlePCFlags.MUST_NOT_FRAGMENT,
+        crc_type=CRCType.CRC16_X25,
+        dest_eid=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
+        src_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+        rpt_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+        creation_timestamp=CreationTimestamp({"time": 755533838904, "sequence": 0}),
+        lifetime=3600000,
+        crc=b"\x0b\x19",
+        # NOTE: No timestamp flag here
+    )
+
+    assert primary_block.creation_timestamp.time == 755533838904
+
+    # Ensure None Type can be supplied for timestamp without crashing.
+    primary_block = PrimaryBlock(
+        version=7,
+        control_flags=BundlePCFlags.MUST_NOT_FRAGMENT,
+        crc_type=CRCType.CRC16_X25,
+        dest_eid=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
+        src_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+        rpt_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+        creation_timestamp=None,
+        lifetime=3600000,
+        crc=b"\x0b\x19",
+        # NOTE: No timestamp flag here
+    )
+
+
+if __name__ == "__main__":
+    test_legacy_suite()
+    test_bundle_eq_operator()
+    test_bundle_gen_variable_payload()
+    test_bundle_pri_blk_curr_dtntime()
+    print("UNIT TEST PASS".center(80, "*"))
 
 
 def test_crcverify_primary():
@@ -1370,13 +1422,13 @@ def test_crcverify_primary():
 
     # Decode it (this checks that the CRC from this binary is actually put within the block)
     redecoded_b = Bundle.from_bytes(encoded_b)
-    assert(redecoded_b.pri_block.is_crc_valid() == True)
+    assert redecoded_b.pri_block.is_crc_valid() == True
 
     # Manually invalidate the primary block CRC and ensure is_crc_valid() returns False
     bad_crc = bytearray(copy.deepcopy(redecoded_b.pri_block.crc))
-    bad_crc[0] = (~bad_crc[0] % 256)
+    bad_crc[0] = ~bad_crc[0] % 256
     redecoded_b.pri_block.crc = bytes(bad_crc)
-    assert(redecoded_b.pri_block.is_crc_valid() == False)
+    assert redecoded_b.pri_block.is_crc_valid() == False
 
 
 def test_crcverify_canonical():
@@ -1392,13 +1444,14 @@ def test_crcverify_canonical():
     # Decode it and make sure the CRC can be recomputed and invalidated for each canonical block
     redecoded_b = Bundle.from_bytes(encoded_b)
     for canon_blk in redecoded_b.canon_blocks:
-        assert(canon_blk.is_crc_valid() == True), str(type(canon_blk))
+        assert canon_blk.is_crc_valid() == True, str(type(canon_blk))
 
         # Manually invalidate the primary block CRC and ensure is_crc_valid() returns False
         bad_crc = bytearray(copy.deepcopy(canon_blk.crc))
-        bad_crc[0] = (~bad_crc[0] % 256)
+        bad_crc[0] = ~bad_crc[0] % 256
         canon_blk.crc = bytes(bad_crc)
-        assert(canon_blk.is_crc_valid() == False), str(type(canon_blk))
+        assert canon_blk.is_crc_valid() == False, str(type(canon_blk))
+
 
 # TEST RUNNER #
 if __name__ == "__main__":
@@ -1414,6 +1467,6 @@ if __name__ == "__main__":
         traceback.print_exc()
     finally:
         if err:
-            print("UNIT TEST FAIL".center(80,"*"))
+            print("UNIT TEST FAIL".center(80, "*"))
         else:
             print("UNIT TEST PASS".center(80, "*"))

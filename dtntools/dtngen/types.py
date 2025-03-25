@@ -88,6 +88,12 @@ class CRCFlag(IntEnum):
     CALCULATE = -1
 
 
+class TimestampFlag(IntEnum):
+    """Flag to indiciate if a CreationTimestamp for the primary block should be generated using current time."""
+
+    CURR_TIME = 1
+
+
 def calc_crc(crc_type, fields):
     r"""Calculate CRC given crc type and fields. The fields will be cbor encoded.
 

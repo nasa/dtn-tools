@@ -1,4 +1,3 @@
-import datetime
 import json
 import os
 import random
@@ -19,10 +18,12 @@ from .types import (
     CREBData,
     CTEBData,
     HopCountData,
+    TimestampFlag,
     TypeWarning,
     calc_crc,
     default_encoder,
 )
+from .utils import DtnTimeNowMs
 
 
 class Block(ABC):
@@ -1283,6 +1284,7 @@ class PrimaryBlock(Block):
         creation_timestamp=None,
         lifetime=None,
         crc=None,
+        timestamp_flag=None,
     ):
         """Initialize the primary block with the requested fields.
 
@@ -1294,10 +1296,12 @@ class PrimaryBlock(Block):
 initially transmitted, or null endpoint if anomymous
         :param EID rpt_eid: (optional) bundle endpoint to which status reports \
 pertaining to the forwarding and delivery of this bundle are to be transmitted
-        :param CreationTimestamp creation_timestamp: (optional) creation timestamp
+        :param CreationTimestamp creation_timestamp: (optional) creation timestamp.
         :param int lifetime: (optional) number of milliseconds past the \
-creation time at which the bundle's payload will no longer be useful
+creation time at which the bundle's payload will no longer be useful.
         :param bytes crc: (optional) crc value or CRCFlag.CALCULATE to calculate it
+        :param TimestampFlag timestamp_flag: (optional) If this parameter is supplied with TimestampFlag.CURR_TIME \
+        the primary block is created with a timestamp of current time, and sequence number 0
 
         *Usage:*
 
@@ -1355,6 +1359,16 @@ creation time at which the bundle's payload will no longer be useful
             )
             warnings.warn(warnmsg, TypeWarning)
         self.rpt_eid = rpt_eid
+
+        if timestamp_flag is not None:
+            if timestamp_flag == TimestampFlag.CURR_TIME:
+                creation_timestamp = CreationTimestamp(
+                    {"time": DtnTimeNowMs(), "sequence": 0}
+                )
+            else:
+                warnmsg = "PrimaryBlock timestamp_flag is only supports TimestampFlag.CURR_TIME"
+                warnings.warn(warnmsg, TypeWarning)
+                creation_timestamp = None
 
         if not isinstance(creation_timestamp, CreationTimestamp):
             warnmsg = f"PrimaryBlock creation_timestamp is type {type(creation_timestamp).__name__} instead of CreationTimestamp"
@@ -1710,11 +1724,7 @@ class PrimaryBlockSettings:
             generated_primary_block = primary_block_settings.generate(3)
         """
         if self.cts_time_current:
-            # The difference in milliseconds between the UTC epoch and the
-            # dtn epoch is 946684800000
-            generated_time = (
-                int(datetime.datetime.now().timestamp() * 1000) - 946684800000
-            )
+            generated_time = DtnTimeNowMs()
         else:
             generated_time = self.cts_time_start + self.cts_time_increment * bundle_num
 
