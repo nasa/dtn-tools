@@ -5,8 +5,6 @@ from dtntools.dtngen.bundle import Bundle
 
 LOCAL_IP = "127.0.0.1"
 LOCAL_PORT = 13708
-# LOCAL_IP = "10.1.1.230"
-# LOCAL_PORT = 13708
 
 data_receiver = UdpRxSocket(LOCAL_IP, LOCAL_PORT)
 data_receiver.connect()
@@ -26,7 +24,7 @@ try:
         last_cnt = data_receiver.get_packets_received()
         print(last_cnt)
         packets = packets + data_receiver.read_all()
-        time.sleep(5)
+        time.sleep(10)
 
 except KeyboardInterrupt:
     pass

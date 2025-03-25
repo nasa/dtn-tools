@@ -1,9 +1,11 @@
-# Cloud Instance Performance Test - RX Side
-# Includes use of Data Receiver
+# DTN Tools Concurrent Contact Test - Contact 1 Receiver
+# Demonstrates support of concurrent contacts for a DTN implementation configured as a Relay Node
 # Convergence Layer: UDP
+# This script does NOT work in OpenC3 COSMOS
 
 # Prerequisites:
-# - DTN CLA packages installed
+# - DTN Tools packages installed for command line use
+# - DTN implementation configured to send to port 4558 on the machine this script is executed from
 
 import time
 import traceback

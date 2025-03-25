@@ -1,9 +1,12 @@
-# Cloud Instance Performance Test - TX Side
-# Includes use of Data Sender
+# DTN Tools Concurrent Contact Test - Contact 1 Sender
+# Demonstrates support of concurrent contacts for a DTN implementation configured as a Relay Node
 # Convergence Layer: UDP
+# This script does NOT work in OpenC3 COSMOS
 
 # Prerequisites:
-# - DTN Gen / DTN CLA packages installed
+# - DTN Tools packages installed for command line use
+# - Remote IP address placeholder in the script replaced with actual IP address of DTN implementation
+# - DTN implementation configured to receive on port 4556
 
 import codecs
 import time
@@ -54,7 +57,7 @@ primary_block_settings = PrimaryBlockSettings(
     src_eid=EID({"uri": 2, "ssp": {"node_num": 101, "service_num": 1}}),
     rpt_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
     creation_timestamp={
-        "time": {"start": 755533838904, "increment": 256},
+        "time": "current",
         "sequence": {"start": 0},
     },
     lifetime=3600000,

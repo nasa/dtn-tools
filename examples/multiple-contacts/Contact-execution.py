@@ -1,6 +1,11 @@
-# Cloud Instance Concurrent Contact Test
-# Includes use of Data Sender and Date Receiver
+# DTN Tools Concurrent Contact Test - Master script
+# Demonstrates support of concurrent contacts for a DTN implementation configured as a Relay Node
 # Convergence Layer: UDP
+# This script does NOT work in OpenC3 COSMOS
+
+# Prerequisites:
+# - DTN Tools packages installed for command line use
+# - Called scripts are located in the same folder as this script
 
 import subprocess
 import time

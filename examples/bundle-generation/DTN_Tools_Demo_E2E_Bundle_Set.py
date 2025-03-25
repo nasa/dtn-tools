@@ -1,9 +1,14 @@
-# DTN CLA Loopback Test (Multiple Bundles) using configurable (COSMOS) delay
-# Includes use of Data Generator, Data Sender, Data Receiver, and Data Interpreter
+# DTN Tools End To End Test (50 Bundles) using a DTN implementation configured as a Relay Node
+# Demonstrates how to modify individual bundles in a set of bundles
+# Demonstrates generation and of both valid (48) and invalid (2) bundles of different sizes
 # Convergence Layer: UDP
 
 # Prerequisites:
-# - DTN Gen / DTN CLA packages installed in COSMOS
+# - DTN Tools packages installed in COSMOS or for command line use
+# - A "bundles" folder for storing bundles exists (modify path in the script as needed)
+# - If the script is running from COSMOS, the "bundles" folder has been mapped in compose.yaml
+# - Remote IP address placeholder in the script replaced with actual IP address of DTN implementation
+# - DTN implementation configured to receive on port 4556, and send bundles back on port 4558
 
 import codecs
 import subprocess
@@ -40,13 +45,10 @@ from dtntools.dtngen.types import (
     TypeWarning,
 )
 
+# SECTION 1: Creating a new set of bundles
+
+
 warnings.simplefilter("always")
-
-from dtntools.dtncla.errors.inject import inject_errors
-from dtntools.dtncla.udp import UdpRxSocket, UdpTxSocket
-
-print("Set Script Runner line delay")
-# set_line_delay(0.000)
 
 print("Define new primary and payload blocks")
 primary_block_settings = PrimaryBlockSettings(
@@ -57,7 +59,7 @@ primary_block_settings = PrimaryBlockSettings(
     src_eid=EID({"uri": 2, "ssp": {"node_num": 101, "service_num": 1}}),
     rpt_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
     creation_timestamp={
-        "time": {"start": 755533838904, "increment": 256},
+        "time": "current",
         "sequence": {"start": 0},
     },
     lifetime=3600000,
@@ -69,45 +71,70 @@ payload_block_settings = PayloadBlockSettings(
     blk_num=1,
     control_flags=0,
     crc_type=CRCType.CRC16_X25,
-    payload={"min_size": 32000, "max_size": 32000},
+    payload={"min_size": 700, "max_size": 1300},
     crc=CRCFlag.CALCULATE,
 )
 
 print("Creating the new set of bundles")
 generated_bundles = Bundle.generate(
-    num_bundles=200,
+    num_bundles=50,
     pri_settings=primary_block_settings,
     canon_settings=[payload_block_settings],
 )
 
+print("Writing the generated bundles to json files")
+for idx, x in enumerate(generated_bundles):
+    print(x.to_json_file(f"/bundles/generated_bundle_{idx+1}.json"))
+
+print("Modifying one bundle in the set")
+generated_bundles[19].pri_block.lifetime = 1800000
+generated_bundles[19].pri_block.crc = CRCFlag.CALCULATE
+
+print("Making two bundles in the set invalid")
+generated_bundles[4].pri_block.version = 5
+generated_bundles[4].pri_block.crc = CRCFlag.CALCULATE
+generated_bundles[34].canon_blocks[0].blk_num = "BAD"
+generated_bundles[34].canon_blocks[0].crc = CRCFlag.CALCULATE
+
+print("Writing the modified bundles to json files")
+generated_bundles[4].to_json_file("/bundles/modified_bundle_5.json")
+generated_bundles[19].to_json_file("/bundles/modified_bundle_20.json")
+generated_bundles[34].to_json_file("/bundles/modified_bundle_35.json")
+
 print("Converting bundles to bytes")
 bundle_data = [x.to_bytes() for x in generated_bundles]
 
+
+# SECTION 2: Sending the new bundles to DTN Node and receiving them back
+
+from dtntools.dtncla.udp import UdpRxSocket, UdpTxSocket
+
+REMOTE_IP = "X.X.X.X"
+REMOTE_PORT = 4556
+LOCAL_IP = "0.0.0.0"
+LOCAL_PORT = 4558
+
 print("Configuring the Data Sender and Data Receiver")
-data_receiver = UdpRxSocket("0.0.0.0", 4556)
-data_sender = UdpTxSocket("127.0.0.1", 4556)
+data_sender = UdpTxSocket(REMOTE_IP, REMOTE_PORT)
+data_receiver = UdpRxSocket(LOCAL_IP, LOCAL_PORT)
 
 try:
     print("Connecting the Data Sender and Data Receiver")
     data_receiver.connect()
     data_sender.connect()
 
-    data_receiver.reset_packets_received()
-    data_sender.reset_packets_sent()
-
     print("Sending the bundles to the DTN Node")
     for x in bundle_data:
         data_sender.write(x)
 
     print("Receiving the bundles returned from the DTN Node")
-    for x in range(1, len(bundle_data) + 1):
-        received_bundle = data_receiver.read()
-        print(f"Packets received = {data_receiver.get_packets_received()}")
+    for x in range(len(bundle_data)):
+        received_bundle = data_receiver.read(timeout=5)
 
     print(f"Packets sent = {data_sender.get_packets_sent()}")
-    assert data_sender.get_packets_sent() == 200
+    assert data_sender.get_packets_sent() == 50
     print(f"Packets received = {data_receiver.get_packets_received()}")
-    assert data_receiver.get_packets_received() == 200
+    assert data_receiver.get_packets_received() == 48
 
 except KeyboardInterrupt:
     pass

@@ -1,9 +1,12 @@
-# Cloud Instance Performance Test - RX Side (250,000 bundles)
-# Includes use of Data Receiver
+# DTN Tools Performance Test (250,000 bundles) - Receiving Side
+# Demonstrates receiving a set of 250,000 bundles
 # Convergence Layer: UDP
+# This version of the script works both in OpenC3 COSMOS and from command line
 
 # Prerequisites:
-# - DTN CLA packages installed
+# - DTN Tools packages installed for COSMOS or command line use
+# - If running in COSMOS, uncomment the "set_line_delay(0.000)" line
+# - Port 4556 is available for use
 
 import time
 import traceback

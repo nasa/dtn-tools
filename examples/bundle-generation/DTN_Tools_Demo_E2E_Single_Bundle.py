@@ -1,11 +1,13 @@
-# DTN Gen / DTN CLA End To End Test (Single Bundle) using HDTN as a Relay Node
-# Includes use of Data Generator, Data Sender, Data Receiver, and Data Interpreter
+# DTN Tools End To End Test (Single Bundle) using a DTN implementation configured as a Relay Node
+# Demonstrates bundle creation, CBOR encoding, conversion to readable format, and verification of block elements
 # Convergence Layer: UDP
 
 # Prerequisites:
-# - DTN Gen / DTN CLA packages installed in COSMOS
-# - HDTN running in relay mode (UDP) - configuration file: hdtn_udp_relay.json
-# - Wireshark is capturing traffic on ports 4556 and 4558
+# - DTN Tools packages installed in COSMOS or for command line use
+# - A "bundles" folder for storing bundles exists (modify path in the script as needed)
+# - If the script is running from COSMOS, the "bundles" folder has been mapped in compose.yaml
+# - Remote IP address placeholder in the script replaced with actual IP address of DTN implementation
+# - DTN implementation configured to receive on port 4556, and send bundles back on port 4558
 
 import codecs
 import os
@@ -54,8 +56,8 @@ primary_block = PrimaryBlock(
     dest_eid=EID({"uri": 2, "ssp": {"node_num": 103, "service_num": 1}}),
     src_eid=EID({"uri": 2, "ssp": {"node_num": 101, "service_num": 1}}),
     rpt_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
-    creation_timestamp=CreationTimestamp({"time": 755533838904, "sequence": 0}),
-    lifetime=3600000,
+    creation_timestamp=CreationTimestamp({"time": 795715474411, "sequence": 0}),
+    lifetime=1577880000000,
     crc=CRCFlag.CALCULATE,
 )
 
@@ -94,19 +96,19 @@ if decoded_bundle:
     decoded_bundle.to_json_file(f"/bundles/original_bundle.json")
 
 
-# SECTION 2: Sending the new bundle to HDTN and receiving it back from HDTN
+# SECTION 2: Sending the new bundles to DTN Node and receiving them back
 
 from dtntools.dtncla.udp import UdpRxSocket, UdpTxSocket
 
-HDTN_IP = "10.2.13.191"
-HDTN_PORT = 4556
+REMOTE_IP = "X.X.X.X"
+REMOTE_PORT = 4556
 LOCAL_IP = "0.0.0.0"
 LOCAL_PORT = 4558
 
 os.system("rm -f /bundles/looped_bundle.json")
 
 print("Configuring the Data Sender and Data Receiver")
-data_sender = UdpTxSocket(HDTN_IP, HDTN_PORT)
+data_sender = UdpTxSocket(REMOTE_IP, REMOTE_PORT)
 data_receiver = UdpRxSocket(LOCAL_IP, LOCAL_PORT)
 
 try:
@@ -159,10 +161,10 @@ assert decoded_bundle.pri_block.src_eid.ssp["service_num"] == 1
 assert decoded_bundle.pri_block.rpt_eid.uri == 2
 assert decoded_bundle.pri_block.rpt_eid.ssp["node_num"] == 100
 assert decoded_bundle.pri_block.rpt_eid.ssp["service_num"] == 1
-assert decoded_bundle.pri_block.creation_timestamp.time == 755533838904
+assert decoded_bundle.pri_block.creation_timestamp.time == 795715474411
 assert decoded_bundle.pri_block.creation_timestamp.sequence == 0
-assert decoded_bundle.pri_block.lifetime == 3600000
-assert decoded_bundle.pri_block.crc == b"\xf4\x0a"
+assert decoded_bundle.pri_block.lifetime == 1577880000000
+assert decoded_bundle.pri_block.crc == b"\x03\x20"
 
 print("Verifying the received Hop Count block")
 assert decoded_bundle.canon_blocks[1].blk_type == BlockType.HOP_COUNT

@@ -75,12 +75,10 @@ packet = generated_bundles[0].to_bytes()
 
 RECEIVER_IP = "127.0.0.1"
 RECEIVER_PORT = 13708
-# RECEIVER_IP = "10.1.1.230"
-# RECEIVER_PORT = 13708
 
 print("Creating TX socket with 600 Mbps rate limit and 0.5 second inter-message delay")
 data_sender = UdpTxSocket(
-    RECEIVER_IP, RECEIVER_PORT, bps_limit=600e6, inter_msg_delay=0.5
+    RECEIVER_IP, RECEIVER_PORT, bps_limit=200e6, inter_msg_delay=0.5
 )
 data_sender.connect()
 
