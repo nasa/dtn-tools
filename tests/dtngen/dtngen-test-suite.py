@@ -1402,14 +1402,6 @@ def test_bundle_pri_blk_curr_dtntime():
     )
 
 
-if __name__ == "__main__":
-    test_legacy_suite()
-    test_bundle_eq_operator()
-    test_bundle_gen_variable_payload()
-    test_bundle_pri_blk_curr_dtntime()
-    print("UNIT TEST PASS".center(80, "*"))
-
-
 def test_crcverify_primary():
     """Verify that the primary block CRC is validated.
 
@@ -1460,6 +1452,7 @@ if __name__ == "__main__":
         test_legacy_suite()
         test_bundle_eq_operator()
         test_bundle_gen_variable_payload()
+        test_bundle_pri_blk_curr_dtntime()
         test_crcverify_primary()
         test_crcverify_canonical()
     except Exception:
