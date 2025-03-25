@@ -1310,13 +1310,13 @@ def test_legacy_suite():
         traceback.print_exc()
 
 
-
 def test_bundle_eq_operator():
     # These two bundles should be equivalent because they're created by the same
     # generator function 'create_valid_bundle'
     bundle_a = create_valid_bundle()
     bundle_b = create_valid_bundle()
     assert bundle_a == bundle_b
+
 
 def test_bundle_gen_variable_payload():
     """Verify that the payload for bundle generate ends up being variable size."""
@@ -1357,8 +1357,63 @@ def test_bundle_gen_variable_payload():
         payload_lens.append(len(payload_block.payload))
     assert(len(set(payload_lens)) > 1)
 
+
+def test_crcverify_primary():
+    """Verify that the primary block CRC is validated.
+
+    .. note::
+        This test relies on our encoder already having been tested to correctly calculate CRC
+    """
+    # Create a valid bundle and check the CRC (note this test relies on our encoder correctly calculated)
+    b = create_valid_bundle()
+    encoded_b = b.to_bytes()
+
+    # Decode it (this checks that the CRC from this binary is actually put within the block)
+    redecoded_b = Bundle.from_bytes(encoded_b)
+    assert(redecoded_b.pri_block.is_crc_valid() == True)
+
+    # Manually invalidate the primary block CRC and ensure is_crc_valid() returns False
+    bad_crc = bytearray(copy.deepcopy(redecoded_b.pri_block.crc))
+    bad_crc[0] = (~bad_crc[0] % 256)
+    redecoded_b.pri_block.crc = bytes(bad_crc)
+    assert(redecoded_b.pri_block.is_crc_valid() == False)
+
+
+def test_crcverify_canonical():
+    """Verify that the CRC for RFC 9171 extension blocks are validated.
+
+    .. note::
+        This test relies on our encoder already having been tested to correctly calculate CRC
+    """
+    # Create a valid bundle and check the CRC (note this test relies on our encoder correctly calculated)
+    b = create_valid_bundle()
+    encoded_b = b.to_bytes()
+
+    # Decode it and make sure the CRC can be recomputed and invalidated for each canonical block
+    redecoded_b = Bundle.from_bytes(encoded_b)
+    for canon_blk in redecoded_b.canon_blocks:
+        assert(canon_blk.is_crc_valid() == True), str(type(canon_blk))
+
+        # Manually invalidate the primary block CRC and ensure is_crc_valid() returns False
+        bad_crc = bytearray(copy.deepcopy(canon_blk.crc))
+        bad_crc[0] = (~bad_crc[0] % 256)
+        canon_blk.crc = bytes(bad_crc)
+        assert(canon_blk.is_crc_valid() == False), str(type(canon_blk))
+
+# TEST RUNNER #
 if __name__ == "__main__":
-    test_legacy_suite()
-    test_bundle_eq_operator()
-    test_bundle_gen_variable_payload()
-    print("UNIT TEST PASS")
+    err = False
+    try:
+        test_legacy_suite()
+        test_bundle_eq_operator()
+        test_bundle_gen_variable_payload()
+        test_crcverify_primary()
+        test_crcverify_canonical()
+    except Exception:
+        err = True
+        traceback.print_exc()
+    finally:
+        if err:
+            print("UNIT TEST FAIL".center(80,"*"))
+        else:
+            print("UNIT TEST PASS".center(80, "*"))

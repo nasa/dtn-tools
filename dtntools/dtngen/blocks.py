@@ -3,7 +3,7 @@ import json
 import os
 import random
 import warnings
-from abc import ABC
+from abc import ABC, abstractmethod
 
 import cbor2
 
@@ -40,6 +40,11 @@ class Block(ABC):
         raise NotImplementedError(
             "Forgot to implement decode() in the derived class of Block"
         )
+
+    @abstractmethod
+    def is_crc_valid(self):
+        """Check that the crc the block was initialized with matches the computed CRC per RFC 9171."""
+        pass
 
 
 class CanonicalBlock(Block):
@@ -133,6 +138,41 @@ class CanonicalBlock(Block):
             block_fields["crc"] = cand_block[5]
 
         return block_fields
+
+    @abstractmethod
+    def get_type_spec(self):
+        """Return the type-specific value for a block.
+
+        :return: Type-specific value
+        """
+        pass
+
+    def is_crc_valid(self):
+        """Check that the crc the block was initialized with matches the computed CRC per RFC 9171."""
+        if self.crc == CRCFlag.CALCULATE:
+            warnings.warn(
+                "Check for is_crc_valid is meaningless when block is configured with CRCFlag.CALCUALTE"
+            )
+            return False
+        return self.compute_block_crc() == self.crc
+
+    def compute_block_crc(self):
+        """Calculate the CRC for the block."""
+        if self.crc_type is not None and self.crc_type >= 1 and self.crc_type <= 2:
+            type_spec_data = self.get_type_spec()
+            if not isinstance(type_spec_data, bytes):
+                type_spec_data = cbor2.dumps(type_spec_data, default=default_encoder)
+            tmp = [
+                self.blk_type,
+                self.blk_num,
+                self.control_flags,
+                self.crc_type,
+                type_spec_data,
+            ]
+            cfields = [i for i in tmp if i is not None]
+            return calc_crc(self.crc_type, cfields)
+        else:
+            raise ValueError("Attempted to compute CRC with invalid parameters")
 
     def encode(self, type_spec_data=None):
         """Encode the canonical block using CBOR with the type-specific data.
@@ -1335,6 +1375,33 @@ creation time at which the bundle's payload will no longer be useful
             warnings.warn(warnmsg, TypeWarning)
         self.crc = crc
 
+    def is_crc_valid(self):
+        """Check that the crc the block was initialized with matches the computed CRC per RFC 9171."""
+        if self.crc == CRCFlag.CALCULATE:
+            warnings.warn(
+                "Check for is_crc_valid is meaningless when block is configured with CRCFlag.CALCUALTE"
+            )
+            return False
+        return self.compute_block_crc() == self.crc
+
+    def compute_block_crc(self):
+        """Calculate the CRC for the block."""
+        if self.crc_type is not None and self.crc_type >= 1 and self.crc_type <= 2:
+            tmp = [
+                self.version,
+                self.control_flags,
+                self.crc_type,
+                self.dest_eid,
+                self.src_eid,
+                self.rpt_eid,
+                self.creation_timestamp,
+                self.lifetime,
+            ]
+            fields = [i for i in tmp if i is not None]
+            return calc_crc(self.crc_type, fields)
+        else:
+            raise ValueError("compute_block_crc called with invalid parameters")
+
     def encode(self):
         """Encode the Primary block using CBOR.
 
@@ -1757,3 +1824,7 @@ class UnknownBlock(Block):
             ublock = UnknownBlock.decode(ublock_elements)
         """
         return UnknownBlock(elements=cand_block)
+
+    def is_crc_valid(self):
+        """Check that the crc the block was initialized with matches the computed CRC per RFC 9171."""
+        raise NotImplementedError("Can't check the CRC for an unknown block")
