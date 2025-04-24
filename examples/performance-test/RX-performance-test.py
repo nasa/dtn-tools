@@ -31,10 +31,8 @@ contact_start = time.time()
 try:
     bundles_received = 0
     while bundles_received < 250000:
-        time.sleep(1)
-        data_receiver.read_all()
+        data_receiver.read()
         bundles_received = data_receiver.get_packets_received()
-        print(bundles_received)
 
     print("Disconnecting the Data Receiver")
     data_receiver.disconnect()
