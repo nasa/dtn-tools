@@ -5,3 +5,5 @@ Pipfile
 build/
 /*.egg-info/
 __pycache__/
+tests/dtn*/*.json
+tests/dtn*/*.bin

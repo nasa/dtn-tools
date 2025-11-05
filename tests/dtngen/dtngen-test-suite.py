@@ -17,6 +17,7 @@ from dtntools.dtngen.blocks import (
     PrevNodeBlock,
     PrimaryBlock,
     PrimaryBlockSettings,
+    AdminRecordBlock,
     UnknownBlock,
 )
 from dtntools.dtngen.bundle import Bundle
@@ -36,6 +37,10 @@ from dtntools.dtngen.types import (
     StatusRRFlags,
     TimestampFlag,
     TypeWarning,
+    CCSData,
+    AdminRecordType,
+    DispositionCode,
+    BundleSequenceCollection,
 )
 from dtntools.dtngen.utils import DtnTimeNowMs
 
@@ -112,9 +117,9 @@ def create_valid_bundle():
         crc_type=CRCType.CRC16_X25,
         cteb_data=CTEBData(
             {
-                "trans_id": 10,
-                "trans_series_id": 2,
-                "req_orig_eid": EID(
+                "bundle_seq_num": 10,
+                "bundle_seq_id": 2,
+                "block_src_admin_eid": EID(
                     {"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}
                 ),
             }
@@ -257,9 +262,9 @@ def test_legacy_suite():
         crc_type=CRCType.CRC16_X25,
         cteb_data=CTEBData(
             {
-                "trans_id": 10,
-                "trans_series_id": 2,
-                "req_orig_eid": EID(
+                "bundle_seq_num": 10,
+                "bundle_seq_id": 2,
+                "block_src_admin_eid": EID(
                     {"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}
                 ),
             }
@@ -387,11 +392,11 @@ def test_legacy_suite():
     assert bfromfile.canon_blocks[3].blk_num == 4
     assert bfromfile.canon_blocks[3].control_flags == BlockPCFlags.REP_UNPROC
     assert bfromfile.canon_blocks[3].crc_type == CRCType.CRC16_X25
-    assert bfromfile.canon_blocks[3].cteb_data.trans_id == 10
-    assert bfromfile.canon_blocks[3].cteb_data.trans_series_id == 2
-    assert bfromfile.canon_blocks[3].cteb_data.req_orig_eid.uri == 2
-    assert bfromfile.canon_blocks[3].cteb_data.req_orig_eid.ssp["node_num"] == 303
-    assert bfromfile.canon_blocks[3].cteb_data.req_orig_eid.ssp["service_num"] == 1
+    assert bfromfile.canon_blocks[3].cteb_data.bundle_seq_num == 10
+    assert bfromfile.canon_blocks[3].cteb_data.bundle_seq_id == 2
+    assert bfromfile.canon_blocks[3].cteb_data.block_src_admin_eid.uri == 2
+    assert bfromfile.canon_blocks[3].cteb_data.block_src_admin_eid.ssp["node_num"] == 303
+    assert bfromfile.canon_blocks[3].cteb_data.block_src_admin_eid.ssp["service_num"] == 1
     assert bfromfile.canon_blocks[3].crc == b"\x25\xc7"
 
     # Parse Compressed Reporting Extension block
@@ -504,9 +509,9 @@ def test_legacy_suite():
         crc_type=CRCType.CRC16_X25,
         cteb_data=CTEBData(
             {
-                "trans_id": 10,
-                #          "trans_series_id": 2,
-                "req_orig_eid": EID(
+                "bundle_seq_num": 10,
+                #          "bundle_seq_id": 2,
+                "block_src_admin_eid": EID(
                     {"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}
                 ),
             }
@@ -666,9 +671,9 @@ def test_legacy_suite():
     assert errbundle_frombin.canon_blocks[3].control_flags == BlockPCFlags.REP_UNPROC
     assert errbundle_frombin.canon_blocks[3].crc_type == CRCType.CRC16_X25
     # Everything is as normal in this case until we get to the CTEBData where the
-    # trans_series_id was left out. Because there are the wrong number of elements
+    # bundle_seq_id was left out. Because there are the wrong number of elements
     # it does not know it is CTEBData and instead is added as an array, with the
-    # second element the req_orig_eid, but it ends up here as an array as well.
+    # second element the block_src_admin_eid, but it ends up here as an array as well.
     assert errbundle_frombin.canon_blocks[3].cteb_data[0] == 10
     assert errbundle_frombin.canon_blocks[3].cteb_data[1][0] == 2
     assert errbundle_frombin.canon_blocks[3].cteb_data[1][1][0] == 303
@@ -868,9 +873,9 @@ def test_legacy_suite():
         crc_type=CRCType.CRC16_X25,
         cteb_data=CTEBData(
             {
-                "trans_id": 10,
-                "trans_series_id": 2,
-                "req_orig_eid": EID(
+                "bundle_seq_num": 10,
+                "bundle_seq_id": 2,
+                "block_src_admin_eid": EID(
                     {"uri": 2, "ssp": {"node_num": 303, "service_num": 1}}
                 ),
             }
@@ -1346,6 +1351,108 @@ def test_bundle_gen_variable_payload():
         payload_lens.append(len(payload_block.payload))
     assert len(set(payload_lens)) > 1
 
+def test_bundle_gen_admin_record():
+    """Verify that administrative record bundles are processed properly"""
+    primary_block = PrimaryBlock(
+        version=7,
+        control_flags=BundlePCFlags.IS_ADMIN_RECORD,
+        crc_type=CRCType.CRC16_X25,
+        dest_eid=EID({"uri": 2, "ssp": {"node_num": 200, "service_num": 1}}),
+        src_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+        rpt_eid=EID({"uri": 2, "ssp": {"node_num": 100, "service_num": 1}}),
+        creation_timestamp=CreationTimestamp({"time": 755533838904, "sequence": 0}),
+        lifetime=3600000,
+        crc=b"\x0b\x19"
+    )
+
+    admin_block = AdminRecordBlock(
+        blk_type=BlockType.AUTO,
+        blk_num=1,
+        control_flags=0,
+        crc_type=CRCType.CRC16_X25,
+        record_type = AdminRecordType.COMPRESSED_CUSTODY_SIGNAL,
+        record_content = CCSData({
+            DispositionCode.CUSTODY_ACCEPTED: BundleSequenceCollection(
+                                        bundle_seq_id=1,
+                                        first_seq_num=12,
+                                        bundle_seq_range=[2, 4, 5]),
+            DispositionCode.CUSTODY_REFUSED: BundleSequenceCollection(
+                                        bundle_seq_id=3,
+                                        first_seq_num=12,
+                                        bundle_seq_range=[2, 4, 5])
+        }),
+        crc=b"\x0b\x19",
+    )
+
+    bundle = Bundle(
+        pri_block=primary_block,
+        canon_blocks=[
+            admin_block,
+        ],
+    )
+
+    # Encode the bundle
+    encoded = bundle.to_bytes()
+
+    # Print the encoded bundle as a hex string
+    print(f'New admin record encoded:\n{codecs.encode(encoded,"hex")}\n')
+
+    # Write the bundle to a bytes file
+    filename = "bytesout.bin"
+    bundle.to_bytes_file(filename)
+
+    # Decode the encoded bundle bytes
+    bfrombytes = Bundle.from_bytes(encoded)
+    if not bfrombytes:
+        raise ValueError("Output bundle from bytes could not be parsed.")
+
+    # Decode the encoded bundle file
+    bfromfile = Bundle.from_bytes_file(filename)
+    if not bfromfile:
+        raise ValueError("Output bundle from file could not be parsed.")
+
+    print(bfrombytes.to_json())
+
+    # Verify the bundle from file is identical to the input
+    # Parse Primary block
+    assert bfrombytes.pri_block.version == 7
+    assert bfrombytes.pri_block.control_flags == BundlePCFlags.IS_ADMIN_RECORD
+    assert bfrombytes.pri_block.crc_type == CRCType.CRC16_X25
+
+    assert bfrombytes.pri_block.dest_eid.uri == 2
+    assert bfrombytes.pri_block.dest_eid.ssp["node_num"] == 200
+    assert bfrombytes.pri_block.dest_eid.ssp["service_num"] == 1
+
+    assert bfrombytes.pri_block.src_eid.uri == 2
+    assert bfrombytes.pri_block.src_eid.ssp["node_num"] == 100
+    assert bfrombytes.pri_block.src_eid.ssp["service_num"] == 1
+
+    assert bfrombytes.pri_block.rpt_eid.uri == 2
+    assert bfrombytes.pri_block.rpt_eid.ssp["node_num"] == 100
+    assert bfrombytes.pri_block.rpt_eid.ssp["service_num"] == 1
+
+    assert bfrombytes.pri_block.creation_timestamp.time == 755533838904
+    assert bfrombytes.pri_block.creation_timestamp.sequence == 0
+    assert bfrombytes.pri_block.lifetime == 3600000
+    assert bfrombytes.pri_block.crc == b"\x0b\x19"
+
+    # Parse Payload
+    assert bfrombytes.canon_blocks[0].blk_type == BlockType.BUNDLE_PAYLOAD
+    assert bfrombytes.canon_blocks[0].blk_num == 1
+    assert bfrombytes.canon_blocks[0].control_flags == 0
+    assert bfrombytes.canon_blocks[0].crc_type == CRCType.CRC16_X25
+    assert bfrombytes.canon_blocks[0].record_type == AdminRecordType.COMPRESSED_CUSTODY_SIGNAL
+    assert bfrombytes.canon_blocks[0].record_content.ccsdata[DispositionCode.CUSTODY_ACCEPTED].bundle_seq_id == 1
+    assert bfrombytes.canon_blocks[0].record_content.ccsdata[DispositionCode.CUSTODY_ACCEPTED].first_seq_num == 12
+    assert bfrombytes.canon_blocks[0].record_content.ccsdata[DispositionCode.CUSTODY_ACCEPTED].bundle_seq_range[0] == 2
+    assert bfrombytes.canon_blocks[0].record_content.ccsdata[DispositionCode.CUSTODY_ACCEPTED].bundle_seq_range[1] == 4
+    assert bfrombytes.canon_blocks[0].record_content.ccsdata[DispositionCode.CUSTODY_ACCEPTED].bundle_seq_range[2] == 5
+    assert bfrombytes.canon_blocks[0].record_content.ccsdata[DispositionCode.CUSTODY_REFUSED].bundle_seq_id == 3
+    assert bfrombytes.canon_blocks[0].record_content.ccsdata[DispositionCode.CUSTODY_REFUSED].first_seq_num == 12
+    assert bfrombytes.canon_blocks[0].record_content.ccsdata[DispositionCode.CUSTODY_REFUSED].bundle_seq_range[0] == 2
+    assert bfrombytes.canon_blocks[0].record_content.ccsdata[DispositionCode.CUSTODY_REFUSED].bundle_seq_range[1] == 4
+    assert bfrombytes.canon_blocks[0].record_content.ccsdata[DispositionCode.CUSTODY_REFUSED].bundle_seq_range[2] == 5
+    assert bfrombytes.canon_blocks[0].crc == b"\x0b\x19"
 
 def test_bundle_pri_blk_curr_dtntime():
     """Verify that the primary block settings can be requested to calculate the current DTN Time."""
@@ -1452,6 +1559,7 @@ if __name__ == "__main__":
         test_legacy_suite()
         test_bundle_eq_operator()
         test_bundle_gen_variable_payload()
+        test_bundle_gen_admin_record()
         test_bundle_pri_blk_curr_dtntime()
         test_crcverify_primary()
         test_crcverify_canonical()

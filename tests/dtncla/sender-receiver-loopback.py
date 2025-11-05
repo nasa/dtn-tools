@@ -96,19 +96,22 @@ try:
     test_bundle = create_test_bundle()
 
     # Send bundles to the DTN Node
-    print("Sending packets to the DTN Node. Press ctrl-c to stop and retrieve packets.")
-    while True:
+    print("Sending packets to the DTN Node.")
+    loop = 0
+    while loop < 50000:
         data_sender.write(test_bundle)
+        loop += 1
 
-except KeyboardInterrupt:
     print("\nStopping the read and getting the read bundles")
     rx_bundles = data_receiver.read_all()
 
     print(f"Packets sent = {data_sender.get_packets_sent()}")
+    assert data_sender.get_packets_sent() == 50000
+
     print(f"Packets received = {data_receiver.get_packets_received()}")
+    assert data_receiver.get_packets_received() == 50000
 
     print(f"rx_bundles length = {len(rx_bundles)}")
-
     print(f"{Bundle.from_bytes(rx_bundles[len(rx_bundles)-1])}")
     print(f"bps = {data_sender.get_bps()}")
     pass

@@ -8,6 +8,9 @@ from .types import (
     HopCountData,
     InvalidCBOR,
     RawData,
+    CCSData,
+    DispositionCode,
+    BundleSequenceCollection,
 )
 
 
@@ -31,9 +34,9 @@ def custom_encoder(x):
         return {
             "type": "CTEBData",
             "value": {
-                "trans_id": x.trans_id,
-                "trans_series_id": x.trans_series_id,
-                "req_orig_eid": x.req_orig_eid,
+                "bundle_seq_num": x.bundle_seq_num,
+                "bundle_seq_id": x.bundle_seq_id,
+                "block_src_admin_eid": x.block_src_admin_eid,
             },
         }
     elif isinstance(x, CREBData):
@@ -46,6 +49,21 @@ def custom_encoder(x):
                 "scope_node_id": x.scope_node_id,
                 "rpt_eid": x.rpt_eid,
             },
+        }
+    elif isinstance(x, CCSData):
+        return {
+            "type": "CCSData",
+            "CUSTODY_ACCEPTED": x.ccsdata[DispositionCode.CUSTODY_ACCEPTED],
+            "CUSTODY_REFUSED": x.ccsdata[DispositionCode.CUSTODY_REFUSED],
+        }
+    elif isinstance(x, BundleSequenceCollection):
+        return {
+            "type": "BundleSequenceCollection",
+            "bundle_seq_id": x.bundle_seq_id,
+            "dest_eid": x.dest_eid,
+            "first_seq_num": x.first_seq_num,
+            "bundle_seq_range": x.bundle_seq_range,
+            "block_src_admin_eid": x.block_src_admin_eid,
         }
     elif isinstance(x, InvalidCBOR):
         return {
@@ -80,9 +98,9 @@ def custom_decoder(x):
     elif x.get("type") == "CTEBData":
         return CTEBData(
             {
-                "trans_id": x["value"]["trans_id"],
-                "trans_series_id": x["value"]["trans_series_id"],
-                "req_orig_eid": x["value"]["req_orig_eid"],
+                "bundle_seq_num": x["value"]["bundle_seq_num"],
+                "bundle_seq_id": x["value"]["bundle_seq_id"],
+                "block_src_admin_eid": x["value"]["block_src_admin_eid"],
             }
         )
     elif x.get("type") == "CREBData":
