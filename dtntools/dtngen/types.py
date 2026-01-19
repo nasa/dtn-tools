@@ -44,7 +44,7 @@ class BlockType(IntFlag):
     PREVIOUS_NODE = 6
     BUNDLE_AGE = 7
     HOP_COUNT = 10
-    CUST_TRANS_EXT = 15
+    CUST_TRANS_EXT = 13
     COMP_RPT_EXT = 16
 
 
