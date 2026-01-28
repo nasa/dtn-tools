@@ -15,7 +15,7 @@ class AdminRecordType(IntFlag):
     """Administrative Record Types."""
 
     BUNDLE_STATUS_REPORT = 1
-    COMPRESSED_CUSTODY_SIGNAL = 4
+    COMPRESSED_CUSTODY_SIGNAL = 13
 
 class DispositionCode(IntFlag):
     """Disposition Codes for Custody Transfer"""
