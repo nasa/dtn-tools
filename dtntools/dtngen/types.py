@@ -1196,4 +1196,3 @@ def default_encoder(encoder, value):
         encoder.write(value.enc_data())
     else:
         raise cbor2.CBOREncodeTypeError(f"cannot serialize type {type(value)}")
-
