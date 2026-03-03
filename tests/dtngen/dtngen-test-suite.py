@@ -416,7 +416,7 @@ def test_legacy_suite():
     assert bfromfile.canon_blocks[3].cteb_data.block_src_admin_eid.uri == 2
     assert bfromfile.canon_blocks[3].cteb_data.block_src_admin_eid.ssp["node_num"] == 303
     assert bfromfile.canon_blocks[3].cteb_data.block_src_admin_eid.ssp["service_num"] == 1
-    assert bfromfile.canon_blocks[3].crc == b"\x25\xc7"
+    assert bfromfile.canon_blocks[3].is_crc_valid()
 
     # Parse Compressed Reporting Extension block
     assert bfromfile.canon_blocks[4].blk_type == BlockType.COMP_RPT_EXT
@@ -699,7 +699,7 @@ def test_legacy_suite():
     assert errbundle_frombin.canon_blocks[3].cteb_data[1][1][1] == 1
     # The CRC in this case is right where it should. No elements were left out of
     # the CTEB block, there was only an element left out of the type-specific data
-    assert errbundle_frombin.canon_blocks[3].crc == b"\x96\xc0"
+    assert errbundle_frombin.canon_blocks[3].is_crc_valid()
 
     # Parse Compressed Reporting Extension block
     assert errbundle_frombin.canon_blocks[4].blk_type == BlockType.COMP_RPT_EXT

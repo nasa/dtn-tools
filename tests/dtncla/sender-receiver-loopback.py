@@ -133,5 +133,6 @@ try:
     print(f"rx_bundles length = {len(rx_bundles)}")
     print(f"{Bundle.from_bytes(rx_bundles[len(rx_bundles)-1])}")
     print(f"bps = {data_sender.get_bps()}")
+finally:
     data_receiver.disconnect()
     data_sender.disconnect()
