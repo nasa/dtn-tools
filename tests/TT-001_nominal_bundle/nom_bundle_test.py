@@ -263,9 +263,9 @@ def nom_bundle_test():
         control_flags=BlockPCFlags.REP_UNPROC,
         crc_type=CRCType.CRC16_X25,
         cteb_data=CTEBData(
-            {"trans_id": 10,
-            "trans_series_id": 2,
-            "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}})}
+            {"bundle_seq_num": 10,
+            "bundle_seq_id": 2,
+            "block_src_admin_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}})}
         ),
         crc=CRCFlag.CALCULATE,
     )
@@ -1185,15 +1185,15 @@ def nom_bundle_test():
         control_flags=BlockPCFlags.REP_UNPROC,
         crc_type=CRCType.CRC16_X25,
         cteb_data=CTEBData(
-            {"trans_id": 7,
-            "trans_series_id": 4,
-            "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 202, "service_num": 2}})}
+            {"bundle_seq_num": 7,
+            "bundle_seq_id": 4,
+            "block_src_admin_eid": EID({"uri": 2, "ssp": {"node_num": 202, "service_num": 2}})}
         ),
         # was:  
         # cteb_data=CTEBData(
-        #     {"trans_id": 10,
-        #     "trans_series_id": 2,
-        #     "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}})}
+        #     {"bundle_seq_num": 10,
+        #     "bundle_seq_id": 2,
+        #     "block_src_admin_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}})}
         # ),
         crc=CRCFlag.CALCULATE,
     )

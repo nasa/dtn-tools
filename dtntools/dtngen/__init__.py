@@ -29,12 +29,12 @@ from .blocks import (
     PrevNodeBlock,
     PrimaryBlock,
     PrimaryBlockSettings,
+    AdminRecordBlock,
     UnknownBlock,
 )
 from .bundle import Bundle
 from .types import (
     EID,
-    AdminRecord,
     AdminRecordType,
     BlockPCFlags,
     BlockType,
@@ -49,6 +49,10 @@ from .types import (
     RawData,
     StatusRRFlags,
     TypeWarning,
+    CCSData,
+    AdminRecordType,
+    DispositionCode,
+    BundleSequenceCollection,    
     calc_crc,
 )
 

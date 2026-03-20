@@ -33,9 +33,10 @@ from .blocks import (
     PrevNodeBlock,
     PrimaryBlock,
     UnknownBlock,
+    AdminRecordBlock,
 )
 from .dtnjson import custom_decoder
-from .types import BlockType
+from .types import BlockType,BundlePCFlags
 
 
 class Bundle:
@@ -137,7 +138,11 @@ class Bundle:
                     block_type = block[0]
                     block_cls = cls._block_lookup.get(block_type, None)
                     if block_cls:
-                        canon_blocks.append(block_cls.decode(block))
+                        if (block_type == BlockType.BUNDLE_PAYLOAD and 
+                            pri_block.control_flags == BundlePCFlags.IS_ADMIN_RECORD):
+                            canon_blocks.append(AdminRecordBlock.decode(block))
+                        else:
+                            canon_blocks.append(block_cls.decode(block))
                     else:
                         warnmsg = (
                             f"Unknown block type {block_type}. Adding as UnknownBlock."

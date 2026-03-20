@@ -39,6 +39,8 @@ from .types import (
     HopCountData,
     TimestampFlag,
     TypeWarning,
+    AdminRecordType,
+    CCSData,
     calc_crc,
     default_encoder,
 )
@@ -697,7 +699,6 @@ node to another
                 cbor2.CBORDecodeEOF,
             ):
                 pass
-
             # If it was not doubly CBOR encoded, pass through original value
             if not cbor2.dumps(tmp) == cand_block[4]:
                 tmp = cand_block[4]
@@ -725,9 +726,9 @@ class CustodyTransferBlock(CanonicalBlock):
         :param int blk_num: (optional) block number
         :param BlockPCFlags (optional) control_flags: block processing control flags
         :param CRCType crc_type: (optional) CRC type
-        :param CTEBData cteb_data: (optional) trans_id identifier for the \
-custody signal, trans_series_id intentifier for a transmission series \
-reg_orig_eid EID of the originator of the custody request
+        :param CTEBData cteb_data: (optional) bundle_seq_num to identify custodial bundle, \
+        bundle_seq_id to identify which sequence counter generated the bundle_seq_num, \
+        block_src_admin_eid EID of the originator of the custody request
         :param bytes crc: (optional) crc value or CRCFlag.CALCULATE to calculate it
 
         *Usage:*
@@ -743,9 +744,10 @@ reg_orig_eid EID of the originator of the custody request
                 control_flags=BlockPCFlags.REP_UNPROC,
                 crc_type=CRCType.CRC16_X25,
                 cteb_data=CTEBData(
-                    {"trans_id": 10,
-                    "trans_series_id": 2,
-                    "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}})}
+                {
+                    "bundle_seq_num": 10,
+                    "bundle_seq_id": 2,
+                    "block_src_admin_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}})}
                 ),
                 crc=CRCFlag.CALCULATE,
             )
@@ -1045,7 +1047,7 @@ class PayloadBlock(CanonicalBlock):
         r"""Return the payload.
 
         :return: Payload
-        :rtype: CBOR bytestring
+        :rtype: a CBOR bytestring
 
         *Usage:*
 
@@ -1288,6 +1290,151 @@ class PayloadBlockSettings:
             crc=self.crc,
         )
 
+class AdminRecordBlock(CanonicalBlock):
+    """RFC9171 Administrative Record Payload Block."""
+
+    def __init__(
+        self,
+        blk_type=None,
+        blk_num=None,
+        control_flags=None,
+        crc_type=None,
+        record_type=None,
+        record_content=None,
+        crc=None,
+    ):
+        r"""Initialize the admin record payload block with the requested fields.
+
+        :param BlockType blk_type: (optional) the type of Canonical block. Can be a specific BlockType or BlockType.AUTO to set to the matching BlockType.
+        :param int blk_num: (optional) block number
+        :param BlockPCFlags control_flags: (optional) block processing control flags
+        :param CRCType crc_type: (optional) CRC type
+        :param AdminRecordType record_type: (optional) the type of admin record
+        :param Abstract record_content: (optional) the admin record content. Currently
+               only CCSData is supported
+        :param bytes crc: (optional) crc value or CRCFlag.CALCULATE to calculate it
+
+        *Usage:*
+
+        .. code-block:: python
+
+            from dtngen.blocks import AdminRecordBlock
+            from dtngen.types import BlockType, BlockPCFlags, CRCType, CRCFlag, AdminRecordType
+
+            ccs_data = CCSData(...)
+
+            payload_block = AdminRecordBlock(
+                blk_type=BlockType.AUTO,
+                blk_num=1,
+                control_flags=0,
+                crc_type=CRCType.CRC16_X25,
+                record_type=AdminRecordType.COMPRESSED_CUSTODY_SIGNAL,
+                record_content=ccs_data,
+                crc=CRCFlag.CALCULATE,
+            )
+        """
+        if blk_type == BlockType.AUTO:
+            blk_type = BlockType.BUNDLE_PAYLOAD
+        
+        if (record_type != AdminRecordType.COMPRESSED_CUSTODY_SIGNAL or
+            not isinstance(record_content, CCSData)):
+            warnmsg = f"Only CCS admin records are supported at this time"
+            warnings.warn(warnmsg, TypeWarning)
+
+        self.record_type = record_type
+        self.record_content = record_content
+
+        super().__init__(blk_type, blk_num, control_flags, crc_type, crc)
+
+    def get_type_spec(self):
+        r"""Return the admin record payload.
+
+        :return: Payload
+        :rtype: an array of the record_type (int) and the record_content (AdminRecordContent)
+
+        *Usage:*
+
+        .. code-block:: python
+
+            ts_data = payload_block.get_type_spec()
+        """
+        return [self.record_type, self.record_content]
+
+    def encode(self):
+        """Encode the AdminRecordBlock using CBOR.
+
+        :return: A CBOR-encoded block
+        :rtype: bytearray
+
+        *Usage:*
+
+        .. code-block:: python
+
+            cbor_encoded_arb = admin_block.encode()
+        """
+        return super().encode(self.get_type_spec())
+
+    def to_json(self):
+        """Encode the Admin Record block using json.
+
+        :return: A json-encoded block
+        :rtype: string
+
+        *Usage:*
+
+        .. code-block:: python
+
+            arb_json = admin_block.to_json()
+        """
+        arb_payload = {
+            "record_type": self.record_type,
+            "record_content": self.record_content
+        }
+
+        return super().to_json(
+            type_spec_key="payload", type_spec_data=arb_payload
+        )
+    
+    @classmethod
+    def decode(cls, cand_block):
+        r"""Attempt to decode the candidate block as a BPv7 Admin Record Payload Block.
+
+        :params list cand_block: A list of objects to be interpreted as an Admin Record Payload Block.
+
+        :return: An Admin Record Payload Block
+        :rtype: AdminRecordBlock
+
+        *Usage:*
+
+        The payload data (5th element) is doubly cbor encoded. It is passed into this method as a byte string containing cbor encoded data.
+
+        .. code-block:: python
+
+            from dtngen.blocks import AdminRecordBlock
+
+            arb_elements = [15, 4, 2, 1, b'\\x83\\x0a\\x02\\x82\\x02\\x82\\x19\\x01\\x2f\\x01', b'\\x25\\xc7']
+            arb = AdminRecordBlock.decode(arb_elements)
+        """
+        canon_fields = CanonicalBlock.decode_common(cand_block)
+
+        # Type-specific data is doubly encoded, so need to further cbor decode
+        cand_arb = None
+        ccs_data = None
+        if len(cand_block) >= 5:
+            try:
+                cand_arb = cbor2.loads(cand_block[4])
+            except (
+                TypeError,
+                cbor2.CBORDecodeValueError,
+                cbor2.CBORDecodeError,
+                cbor2.CBORDecodeEOF,
+            ):
+                pass
+            
+            if len(cand_arb) == 2 and isinstance(cand_arb[0], int) and CCSData.lookslike(cand_arb[1]):
+                ccs_data = CCSData.decode(cand_arb[1])
+            
+            return AdminRecordBlock(**canon_fields, record_type=cand_arb[0], record_content=ccs_data)
 
 class PrimaryBlock(Block):
     """RFC9171 Primary Block."""

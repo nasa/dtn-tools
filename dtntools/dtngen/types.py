@@ -24,24 +24,23 @@ from itertools import zip_longest
 import cbor2
 from crccheck.crc import Crc16IbmSdlc, Crc32Iscsi
 
-
 class TypeWarning(Warning):
     """Warning for an incorrect data type detected."""
 
     pass
 
 
-class AdminRecordType:
+class AdminRecordType(IntFlag):
     """Administrative Record Types."""
 
     BUNDLE_STATUS_REPORT = 1
+    COMPRESSED_CUSTODY_SIGNAL = 13
 
+class DispositionCode(IntFlag):
+    """Disposition Codes for Custody Transfer"""
 
-class AdminRecord:
-    """RFC9171 Administrative Record Base Class."""
-
-    pass
-
+    CUSTODY_ACCEPTED =  1
+    CUSTODY_REFUSED  = -1
 
 class BlockPCFlags(IntFlag):
     """Block Processing Control Flags."""
@@ -64,7 +63,7 @@ class BlockType(IntFlag):
     PREVIOUS_NODE = 6
     BUNDLE_AGE = 7
     HOP_COUNT = 10
-    CUST_TRANS_EXT = 15
+    CUST_TRANS_EXT = 13
     COMP_RPT_EXT = 16
 
 
@@ -615,21 +614,21 @@ class CTEBData:
 
             myctebdata = CTEBData(
                 {
-                    "trans_id": 10,
-                    "trans_series_id": 2,
-                    "req_orig_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}})
+                    "bundle_seq_num": 10,
+                    "bundle_seq_id": 2,
+                    "block_src_admin_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 1}})}
                 )
         """
-        self.trans_id = None
-        self.trans_series_id = None
-        self.req_orig_eid = None
+        self.bundle_seq_num = None
+        self.bundle_seq_id = None
+        self.block_src_admin_eid = None
 
-        if "trans_id" in cteb_fields:
-            self.trans_id = cteb_fields["trans_id"]
-        if "trans_series_id" in cteb_fields:
-            self.trans_series_id = cteb_fields["trans_series_id"]
-        if "req_orig_eid" in cteb_fields:
-            self.req_orig_eid = cteb_fields["req_orig_eid"]
+        if "bundle_seq_num" in cteb_fields:
+            self.bundle_seq_num = cteb_fields["bundle_seq_num"]
+        if "bundle_seq_id" in cteb_fields:
+            self.bundle_seq_id = cteb_fields["bundle_seq_id"]
+        if "block_src_admin_eid" in cteb_fields:
+            self.block_src_admin_eid = cteb_fields["block_src_admin_eid"]
 
     def enc_data(self):
         """Return the data to encode.
@@ -643,7 +642,7 @@ class CTEBData:
 
             data = myctebdata.enc_data()
         """
-        data = [self.trans_id, self.trans_series_id, self.req_orig_eid]
+        data = [self.bundle_seq_num, self.bundle_seq_id, self.block_src_admin_eid]
         return [i for i in data if i is not None]
 
     @classmethod
@@ -671,14 +670,14 @@ class CTEBData:
             )
 
         type_spec_dict = {
-            "trans_id": None,
-            "trans_series_id": None,
-            "req_orig_eid": None,
+            "bundle_seq_num": None,
+            "bundle_seq_id": None,
+            "block_src_admin_eid": None,
         }
         cteb_data = dict(zip_longest(type_spec_dict, cand_cteb_data))
 
-        if "req_orig_eid" in cteb_data and cteb_data["req_orig_eid"] is not None:
-            cteb_data["req_orig_eid"] = EID.decode(cteb_data["req_orig_eid"])
+        if "block_src_admin_eid" in cteb_data and cteb_data["block_src_admin_eid"] is not None:
+            cteb_data["block_src_admin_eid"] = EID.decode(cteb_data["block_src_admin_eid"])
 
         return CTEBData(cteb_data)
 
@@ -900,10 +899,281 @@ class CREBData:
             return False
         return True
 
+class BundleSequenceCollection:
+    """Bundle Sequence Collection"""
+
+    def __init__(self, bundle_seq_id=None, dest_eid=None, first_seq_num=None, 
+                                        bundle_seq_range=None, block_src_admin_eid=None):
+        """Initialize the bundle sequence collection
+
+        :param dict bundle_seq_collection: Bundle Sequence Collection
+
+        *Usage:*
+
+        A bundle sequence range has either 3 or 4 items. The first field can be either
+        a bundle_seq_id (integer) or a dest_eid (EID). The second field is the first_seq_num,
+        an integer. The third field is the bundle_seq_range, which is either an integer
+        representing a single range, or an array of odd-numbered length, alternately
+        representing the ranges included or excluded. The fourth field, the block_src_admin_eid,
+        is optional and must always be excluded from CCSs.
+
+        One set of elements provided, for a typical CCS:
+
+        .. code-block:: python
+
+            from dtngen.types import BundleSequenceCollection
+
+            myseqcollection = BundleSequenceCollection(
+                {
+                    "bundle_seq_id": 1,
+                    "first_seq_num": 12,
+                    "bundle_seq_range": [2, 4, 5]
+                )
+
+        Another set of elements provided:
+
+        .. code-block:: python
+
+            from dtngen.types import BundleSequenceCollection
+
+            myseqcollection = BundleSequenceCollection(
+                {
+                    "dest_eid": EID({"uri": 2, "ssp": {"node_num": 306, "service_num": 1}})}
+                    "first_seq_num": 12,
+                    "bundle_seq_range": 1,
+                    "block_src_admin_eid": EID({"uri": 2, "ssp": {"node_num": 303, "service_num": 0}})}
+                )        
+        """
+        self.bundle_seq_id = bundle_seq_id
+        self.dest_eid = dest_eid
+        self.first_seq_num = first_seq_num
+        self.bundle_seq_range = bundle_seq_range
+        self.block_src_admin_eid = block_src_admin_eid
+
+        if self.first_seq_num is None or self.bundle_seq_range is None:
+            warnmsg = "Bundle Sequence Collection: Missing a field"
+            warnings.warn(warnmsg)
+        elif self.bundle_seq_id is not None and self.dest_eid is not None:
+            warnmsg = "Bundle Sequence Collection: Cannot have both a bundle_seq_id and a dest_eid"
+            warnings.warn(warnmsg)
+        elif isinstance(self.bundle_seq_range, list) and len(self.bundle_seq_range) % 2 != 1:
+            warnmsg = "Bundle Sequence Collection: bundle_seq_range must be an odd-numbered list"
+            warnings.warn(warnmsg)            
+
+    def enc_data(self):
+        """Return the data to encode.
+
+        :return: list of data to encode
+        :rtype: list
+
+        *Usage:*
+
+        .. code-block:: python
+
+            data = myctebdata.enc_data()
+        """
+        data = [self.bundle_seq_id, self.dest_eid, self.first_seq_num, self.bundle_seq_range, self.block_src_admin_eid]
+        return [i for i in data if i is not None]
+
+    @classmethod
+    def decode(cls, cand_bundle_seq_collection):
+        """Attempt to parse CTEB data.
+
+        :param list cand_bundle_seq_collection: A list of fields representing a bundle sequence collection
+        :return: The decoded data
+        :rtype: BundleSequenceCollection
+
+        *Usage:*
+
+        .. code-block:: python
+
+            from dtngen.types import BundleSequenceCollection
+
+            ctebd_elements = [10, 2, [2, [303, 1]]]
+            myctebdata = CTEBData.decode(ctebd_elements)
+        """
+        if len(cand_bundle_seq_collection) != 3 and len(cand_bundle_seq_collection) != 4:
+            # Because lookslike() should be called first, we should never get
+            # here. If we do it's a programatic error.
+            raise ValueError(
+                f"Bundle Sequence Collection has {len(cand_bundle_seq_collection)} elements but should have 3 or 4."
+            )
+        
+        bsc_data = {
+            "bundle_seq_id": None,
+            "dest_eid": None,
+            "first_seq_num": None,
+            "bundle_seq_range": None,
+            "block_src_admin_eid": None,
+        }
+
+        if EID.lookslike(cand_bundle_seq_collection[0]):
+            bsc_data["dest_eid"] = EID.decode(cand_bundle_seq_collection[0])
+        else:
+            bsc_data["bundle_seq_id"] = cand_bundle_seq_collection[0]
+        
+        bsc_data["first_seq_num"] = cand_bundle_seq_collection[1]
+
+        if isinstance(cand_bundle_seq_collection[2], list):
+            bsc_data["bundle_seq_range"] = cand_bundle_seq_collection[2]
+
+        if len(cand_bundle_seq_collection) == 4 and EID.lookslike(cand_bundle_seq_collection[3]):
+            bsc_data["block_src_admin_eid"] = EID.decode(cand_bundle_seq_collection[3])
+
+        return BundleSequenceCollection(bsc_data["bundle_seq_id"], 
+                                        bsc_data["dest_eid"],
+                                        bsc_data["first_seq_num"],
+                                        bsc_data["bundle_seq_range"],
+                                        bsc_data["block_src_admin_eid"])
+
+    @classmethod
+    def lookslike(cls, cand_bundle_seq_collection):
+        """Check if a candidate bundle sequence collection looks like a bundle sequence collection
+
+        :param list cand_bundle_seq_collection: A list of fields representing a candidate BSC
+        :return: True if the fields look like BundleSequenceCollection, otherwise False
+        :rtype: bool
+
+        *Usage:*
+
+        .. code-block:: python
+
+            from dtngen.types import BundleSequenceCollection
+
+            if BundleSequenceCollection.lookslike(list_of_candidate_fields):
+                print ("It looks like BundleSequenceCollection")
+        """
+        if not isinstance(cand_bundle_seq_collection, list):
+            return False
+        if not len(cand_bundle_seq_collection) == 3 or len(cand_bundle_seq_collection) == 4:
+            return False
+
+        return (
+            (isinstance(cand_bundle_seq_collection[0], int) or EID.lookslike(cand_bundle_seq_collection[0]))
+            and isinstance(cand_bundle_seq_collection[1], int)
+            and (isinstance(cand_bundle_seq_collection[2], int) or 
+                 (isinstance(cand_bundle_seq_collection[2], list) and len(cand_bundle_seq_collection[2]) % 2 == 1))
+            and (len(cand_bundle_seq_collection) == 3 or EID.lookslike(cand_bundle_seq_collection[3]))
+        )
+
+class CCSData:
+    """Compressed Custody Signal Data"""
+
+    def __init__(self, ccs_data):
+        """Initialize the CCS
+
+        :param dict ccs_data: Compressed Custody Signal Data
+
+        *Usage:*
+
+        The contents of a CCS are a dictionary of nonzero disposition code keys
+        mapping to bundle sequence collections.
+
+        .. code-block:: python
+
+            from dtngen.types import BundleSequenceCollection, CCSData
+
+            myccsdata = CCSData(
+                {
+                    1: BundleSequenceCollection({"bundle_seq_id": 1, 
+                                                 "first_seq_num": 12,
+                                                 "bundle_seq_range": [2, 4, 5]}),
+                    -1: BundleSequenceCollection({"bundle_seq_id": 1, 
+                                                 "first_seq_num": 32,
+                                                 "bundle_seq_range": [2, 4, 5]}),
+                }
+            )
+        """
+
+        if ccs_data is None or not isinstance(ccs_data, dict):
+            warnmsg = "CCS data: field error"
+            warnings.warn(warnmsg)
+
+        for key in ccs_data:
+            if not isinstance(key, int) or key == 0 or not isinstance(ccs_data[key], BundleSequenceCollection):
+                warnmsg = "CCS data: field error"
+                warnings.warn(warnmsg)                
+
+        self.ccsdata = ccs_data          
+
+    def enc_data(self):
+        """Return the data to encode.
+
+        :return: dictionary of data to encode
+        :rtype: dict
+
+        *Usage:*
+
+        .. code-block:: python
+
+            data = myccsdata.enc_data()
+        """
+        return self.ccsdata
+
+    @classmethod
+    def decode(cls, cand_ccs_data):
+        """Attempt to parse CTEB data.
+
+        :param list cand_ccs_data: A list of fields representing CCS data
+        :return: The decoded data
+        :rtype: CCSData
+
+        *Usage:*
+
+        .. code-block:: python
+
+            from dtngen.types import CCSData, BundleSequenceCollection
+
+            ccs_elements = {
+                                1: [10, 2, [2, [303, 1]]],
+                                -1: [10, 2, [2, [303, 1]]]
+                            }
+            ccs_elements = CCSData.decode(ccs_elements)
+        """
+
+        if not isinstance(cand_ccs_data, dict) or len(cand_ccs_data) == 0:
+            # Because lookslike() should be called first, we should never get
+            # here. If we do it's a programatic error.
+            raise ValueError(
+                f"CCS Data has is not a valid type."
+            )
+        
+        ccs_data = {}
+
+        for key in cand_ccs_data:
+            ccs_data[key] = BundleSequenceCollection.decode(cand_ccs_data[key])
+
+        return CCSData(ccs_data)
+
+    @classmethod
+    def lookslike(cls, cand_ccs_data):
+        """Check if a candidate CCS datalooks like CCS data
+
+        :param list cand_ccs_data: A list of fields representing a candidate CCS data
+        :return: True if the fields look like CCSData, otherwise False
+        :rtype: bool
+
+        *Usage:*
+
+        .. code-block:: python
+
+            from dtngen.types import CCSData
+
+            if CCSData.lookslike(list_of_candidate_fields):
+                print ("It looks like CCSData")
+        """
+        if not isinstance(cand_ccs_data, dict) or len(cand_ccs_data) == 0:
+            return False
+
+        for key in cand_ccs_data:
+            if not isinstance(key, int) or key == 0 or not BundleSequenceCollection.lookslike(cand_ccs_data[key]):
+                return False
+        
+        return True
 
 def default_encoder(encoder, value):
     """cbor2 custom field encoder. Encodes a value of one of the defined dtngen.types data types as cbor."""
-    class_list = ["EID", "CreationTimestamp", "HopCountData", "CTEBData", "CREBData"]
+    class_list = ["EID", "CreationTimestamp", "HopCountData", "CTEBData", "CREBData", "CCSData", "BundleSequenceCollection", "CCSData"]
     class_name = type(value).__name__
 
     if class_name in class_list:
